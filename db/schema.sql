@@ -5,9 +5,17 @@
 --
 -- หมายเหตุการออกแบบ: users และ locations แยกกันเด็ดขาด (ไม่ใช่ 1:1)
 -- เพราะข้อมูลจุดตรวจวัด (location) ถูกส่งเข้ามาผ่าน LINE OA โดยใครก็ได้
--- โดยไม่จำเป็นต้องมีบัญชีผู้ใช้บนเว็บ. locations.user_id จึงเป็น FK แบบ
--- nullable ไว้เผื่อกรณีมีบัญชีผูกอยู่ (เช่น แอดมินเป็นคนลงทะเบียนแทน
--- หรือเจ้าของจุดสมัครสมาชิกเว็บเพิ่มเติมภายหลัง) แต่ไม่บังคับ
+-- โดยไม่จำเป็นต้องมีบัญชีผู้ใช้บนเว็บ.
+--
+-- teams ผูกกับทั้ง users และ locations แยกเส้นทางกัน (ไม่ไหลผ่านกัน):
+--   - locations.team_id: ระบุทีมของหมุดนั้นสำหรับแสดงผลบนแผนที่/popup
+--     (ต้องมีค่าได้แม้ location ไม่มี user ผูกอยู่เลย — nullable เผื่อ
+--     กรณีบุคคลทั่วไปส่งข้อมูลแบบไม่มีทีม)
+--   - users.team_id: ใช้กำหนดสิทธิ์ของสมาชิกที่ login เว็บ — member คนไหน
+--     ก็ได้ในทีมเดียวกันแก้ไขได้ทุก location ที่ team_id ตรงกัน ไม่ผูกกับ
+--     "เจ้าของคนเดียว" (nullable เพราะสมาชิกสมัครก่อน แอดมินค่อยกำหนดทีมทีหลัง)
+--   - locations.created_by_user_id: เก็บไว้เป็น audit เฉยๆ ว่า user คนไหน
+--     (ถ้ามี) เป็นผู้ลงทะเบียน/แก้ไขจุดนี้ล่าสุดทางเว็บ — ไม่ใช่ตัวตัดสินสิทธิ์
 -- ============================================================
 
 CREATE EXTENSION IF NOT EXISTS pgcrypto; -- สำหรับ gen_random_uuid()
@@ -23,12 +31,14 @@ CREATE TABLE teams (
 
 -- ------------------------------------------------------------
 -- users: บัญชี login สำหรับเข้าใช้งานเว็บ (admin / member)
--- ไม่ผูกกับ location โดยตรง — เป็นแค่สิทธิ์การเข้าใช้งานระบบ
+-- ไม่ผูกกับ location โดยตรง — team_id กำหนดว่า member คนนี้มีสิทธิ์
+-- แก้ไข location ของทีมไหนได้บ้าง (ดูหมายเหตุด้านบน)
 -- ------------------------------------------------------------
 CREATE TYPE user_role AS ENUM ('admin', 'member');
 
 CREATE TABLE users (
     id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    team_id         UUID REFERENCES teams(id) ON DELETE SET NULL, -- nullable: สมัครก่อน แอดมินกำหนดทีมทีหลัง
     email           VARCHAR(255) NOT NULL UNIQUE,
     password_hash   VARCHAR(255) NOT NULL,
     role            user_role NOT NULL DEFAULT 'member',
@@ -37,15 +47,19 @@ CREATE TABLE users (
     updated_at      TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
+CREATE INDEX idx_users_team_id ON users(team_id);
+
 -- ------------------------------------------------------------
 -- locations: จุดตรวจวัด/หมุดบนแผนที่ — หน่วยหลักของระบบ
--- 1 location = 1 หมุดบนแผนที่. ไม่ผูกกับ users แบบบังคับ เพราะข้อมูล
--- เข้ามาผ่าน LINE OA จากใครก็ได้. user_id เป็น optional link เท่านั้น
+-- 1 location = 1 หมุดบนแผนที่. team_id เป็นตัวบอก "ทีม" ของหมุดนี้โดยตรง
+-- (ไม่ผ่าน users) เพราะต้องแสดงผลได้แม้ location ไม่มี user ผูกอยู่เลย.
+-- created_by_user_id เป็นแค่ audit ไม่ใช่ตัวกำหนดสิทธิ์แก้ไข (สิทธิ์แก้ไข
+-- มาจาก users.team_id ตรงกับ locations.team_id แทน)
 -- ------------------------------------------------------------
 CREATE TABLE locations (
     id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    user_id         UUID REFERENCES users(id) ON DELETE SET NULL, -- nullable, ไม่ unique: 1 user ดูแลได้หลาย location
-    team_id         UUID REFERENCES teams(id) ON DELETE SET NULL,
+    team_id         UUID REFERENCES teams(id) ON DELETE SET NULL, -- nullable: อนุญาตจุดที่ไม่มีทีม (เช่น บุคคลทั่วไป)
+    created_by_user_id UUID REFERENCES users(id) ON DELETE SET NULL, -- audit เท่านั้น, ไม่ unique
     member_name     VARCHAR(255) NOT NULL,       -- ชื่อผู้รับผิดชอบจุดนี้ ณ ตอนลงทะเบียน (ไม่จำเป็นต้องมี user account)
     location_name   VARCHAR(255) NOT NULL,
     latitude        NUMERIC(10, 7) NOT NULL CHECK (latitude BETWEEN -90 AND 90),
@@ -57,8 +71,8 @@ CREATE TABLE locations (
     updated_at      TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
-CREATE INDEX idx_locations_user_id ON locations(user_id);
 CREATE INDEX idx_locations_team_id ON locations(team_id);
+CREATE INDEX idx_locations_created_by_user_id ON locations(created_by_user_id);
 CREATE INDEX idx_locations_line_user_id ON locations(line_user_id);
 CREATE INDEX idx_locations_lat_lng ON locations(latitude, longitude);
 
@@ -157,10 +171,15 @@ CREATE TRIGGER set_updated_at_locations
 -- ER Diagram (Mermaid) — ดูภาพรวมความสัมพันธ์
 -- ============================================================
 -- erDiagram
---     TEAMS ||--o{ LOCATIONS : "มีจุดตรวจวัด"
---     USERS ||--o{ LOCATIONS : "ดูแลได้หลายจุด (optional)"
+--     TEAMS ||--o{ USERS : "มีสมาชิก login (optional)"
+--     TEAMS ||--o{ LOCATIONS : "มีจุดตรวจวัด (optional)"
+--     USERS ||--o{ LOCATIONS : "audit: ผู้ลงทะเบียนล่าสุด (optional)"
 --     LOCATIONS ||--o{ IMAGES : "ส่งรูปเข้ามา"
 --     LOCATIONS ||--o{ INDICATOR_READINGS : "มีค่าตัวชี้วัด"
 --     IMAGES ||--o| AI_IMAGE_RESULTS : "ถูกแปลผลโดย AI"
 --     AI_IMAGE_RESULTS ||--o{ INDICATOR_READINGS : "สร้างค่า indicator"
 --     INDICATOR_TYPES ||--o{ INDICATOR_READINGS : "เป็นประเภทของ"
+--
+-- หมายเหตุ: TEAMS->USERS และ TEAMS->LOCATIONS เป็นเส้นทางอิสระ ไม่ไหลผ่านกัน
+-- สิทธิ์แก้ไข location ของ member มาจากการจับคู่ users.team_id = locations.team_id
+-- ที่ application layer ไม่ใช่ FK constraint ในฐานข้อมูล

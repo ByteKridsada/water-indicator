@@ -76,13 +76,22 @@ sequenceDiagram
     Note over D,S: Cron ทุกชั่วโมง: หา images ที่ expires_at < now() และยังไม่ถูกลบ -> ลบไฟล์จริง, อัปเดต status='deleted', เก็บ row/ผลไว้ใน DB ต่อ
 ```
 
-## 4. Users vs. Locations — ทำไมต้องแยกตารางเด็ดขาด
+## 4. Users vs. Locations vs. Teams — ทำไมต้องแยกเส้นทางกัน
 
 ข้อมูลจุดตรวจวัด (`locations`) ถูกส่งเข้ามาผ่าน LINE OA โดย**ใครก็ได้** ไม่จำเป็นต้องมีบัญชีผู้ใช้บนเว็บ (`users`) จึงออกแบบให้:
 
 - `users` และ `locations` เป็นตารางอิสระจากกัน ไม่มี 1:1 บังคับ
-- `locations.user_id` เป็น FK แบบ **nullable** และ**ไม่ unique** — ใช้เฉพาะกรณีมีบัญชีเว็บผูกอยู่จริง (เช่น แอดมินลงทะเบียนแทน หรือภายหลังเจ้าของจุดสมัครสมาชิกเว็บเพิ่ม) 1 user จึงดูแลได้มากกว่า 1 location ได้ด้วย
+- **`teams` ผูกกับทั้ง `users` และ `locations` แยกเส้นทางกัน ไม่ไหลผ่านกัน:**
+  - `locations.team_id` (nullable) — บอก "ทีม" ของหมุดนั้นสำหรับแสดงผลบนแผนที่/popup โดยตรง เพราะ TOR ข้อ 2.2 กำหนดให้ popup ต้องโชว์ชื่อทีมของ**ทุกหมุด** แม้หมุดนั้นไม่มี user ผูกอยู่เลยก็ต้องรู้ทีมได้ — ถ้าให้ team ไหลผ่าน `users` (`users→teams`, `locations→users`) หมุดที่ไม่มี user จะไม่มีทางรู้ทีม เพราะ FK chain ขาดตอน
+  - `users.team_id` (nullable — สมัครก่อน แอดมินกำหนดทีมทีหลัง) — ใช้กำหนด**สิทธิ์แก้ไข**: member คนไหนก็ได้ในทีมเดียวกันแก้ไข location ที่ `team_id` ตรงกันได้ทั้งหมด ไม่ผูกกับ "เจ้าของคนเดียว"
+- `locations.created_by_user_id` (nullable, ไม่ unique) — เก็บไว้เป็น **audit** เฉยๆ ว่า user คนไหน (ถ้ามี) เป็นผู้ลงทะเบียน/แก้ไขจุดนี้ล่าสุดทางเว็บ ไม่ใช่ตัวตัดสินสิทธิ์
 - การจับคู่รูปที่ส่งมาจาก LINE เข้ากับ location ที่ถูกต้อง ใช้ `locations.line_user_id` (ผูกไว้ล่วงหน้าต่อจุด) เป็น key — **ไม่เกี่ยวกับ `users` เลย**
+
+```
+teams ──o{ users           (สิทธิ์แก้ไข: users.team_id = locations.team_id)
+teams ──o{ locations       (แสดงผล: team_name บน popup/map)
+users ──o{ locations       (audit เท่านั้น: created_by_user_id)
+```
 
 ## 5. Data Retention
 
@@ -91,7 +100,7 @@ sequenceDiagram
 
 ## 6. Role & Access
 
-- `admin`: เข้าถึง/แก้ไขข้อมูล location ทั้งหมด, จัดการ indicator master data, ดูภาพ/ผลทุกจุด
-- `member`: (ถ้าผูก `user_id` กับ location ของตนเอง) จัดการข้อมูล location ของตนเอง, ดูข้อมูล indicator ของจุดที่ตนดูแล
+- `admin`: เข้าถึง/แก้ไขข้อมูล location ทั้งหมด (ทุกทีม), จัดการ indicator master data, กำหนด `team_id` ให้ user ที่สมัครเข้ามา, ดูภาพ/ผลทุกจุด
+- `member`: แก้ไขได้เฉพาะ location ที่ `team_id` ตรงกับทีมของตนเอง (ตรวจสอบที่ application layer ตอน request ไม่ใช่ DB constraint) — ถ้า `users.team_id` ยัง null (รอแอดมินกำหนดทีม) จะยังไม่มีสิทธิ์แก้ไข location ใดได้
 
 ดู ER diagram และ DDL เต็มใน [db/schema.sql](../db/schema.sql)
