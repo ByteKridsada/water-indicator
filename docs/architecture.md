@@ -103,4 +103,4 @@ users ──o{ locations       (audit เท่านั้น: created_by_user_
 - `admin`: เข้าถึง/แก้ไขข้อมูล location ทั้งหมด (ทุกทีม), จัดการ indicator master data, กำหนด `team_id` ให้ user ที่สมัครเข้ามา, ดูภาพ/ผลทุกจุด
 - `member`: แก้ไขได้เฉพาะ location ที่ `team_id` ตรงกับทีมของตนเอง (ตรวจสอบที่ application layer ตอน request ไม่ใช่ DB constraint) — ถ้า `users.team_id` ยัง null (รอแอดมินกำหนดทีม) จะยังไม่มีสิทธิ์แก้ไข location ใดได้
 
-ดู ER diagram และ DDL เต็มใน [db/schema.sql](../db/schema.sql)
+ดู ER diagram และ DDL เต็มใน [db/schema.sql](../db/schema.sql) · รายละเอียด endpoint ทั้งหมดใน [docs/api-spec.md](api-spec.md)
