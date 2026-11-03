@@ -71,7 +71,7 @@ export function LocationFormPage() {
     e.preventDefault();
     setError('');
     if (!Number.isFinite(form.latitude) || !Number.isFinite(form.longitude)) {
-      setError('กรุณาเลือกพิกัดบนแผนที่');
+      setError('กรุณาระบุพิกัดโดยค้นหาสถานที่ คลิกบนแผนที่ หรือกรอก Latitude และ Longitude');
       return;
     }
     setSaving(true);
@@ -192,12 +192,8 @@ export function LocationFormPage() {
             latitude={form.latitude}
             longitude={form.longitude}
             onChange={(lat, lng) => setForm((prev) => ({ ...prev, latitude: lat, longitude: lng }))}
+            disabled={!canEdit}
           />
-          <div className="coord-readout">
-            {Number.isFinite(form.latitude)
-              ? `${form.latitude.toFixed(5)}, ${form.longitude.toFixed(5)}`
-              : 'ยังไม่ได้เลือกพิกัด'}
-          </div>
 
           {isEdit && (
             <div className="image-upload">
