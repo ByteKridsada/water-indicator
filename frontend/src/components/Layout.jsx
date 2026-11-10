@@ -22,7 +22,9 @@ export function Layout() {
           {user?.role === 'admin' && <NavLink to="/admin/users">จัดการผู้ใช้</NavLink>}
         </nav>
         <div className="user-menu">
-          <span className="user-email">{user?.email}</span>
+          <NavLink to="/profile" className="user-email" title="ข้อมูลบัญชี">
+            {user?.email}
+          </NavLink>
           {user?.team ? (
             <span className="team-badge">{user.team.team_name}</span>
           ) : (

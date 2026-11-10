@@ -1,12 +1,14 @@
 import { useEffect, useState } from 'react';
 import { listUsers, updateUser } from '../api/users.js';
-import { createTeam, listTeams } from '../api/teams.js';
+import { createTeam, deleteTeam, listTeams, renameTeam } from '../api/teams.js';
 
 export function AdminUsersPage() {
   const [users, setUsers] = useState([]);
   const [teams, setTeams] = useState([]);
   const [unassignedOnly, setUnassignedOnly] = useState(false);
   const [newTeamName, setNewTeamName] = useState('');
+  const [editingTeamId, setEditingTeamId] = useState(null);
+  const [editingName, setEditingName] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
@@ -73,6 +75,36 @@ export function AdminUsersPage() {
     }
   }
 
+  async function handleRenameTeam(e) {
+    e.preventDefault();
+    const name = editingName.trim();
+    if (!name) return;
+    try {
+      const updated = await renameTeam(editingTeamId, name);
+      setTeams((prev) => prev.map((t) => (t.id === updated.id ? { ...t, team_name: updated.team_name } : t)));
+      setUsers((prev) =>
+        prev.map((u) => (u.team?.id === updated.id ? { ...u, team: { ...u.team, team_name: updated.team_name } } : u))
+      );
+      setEditingTeamId(null);
+    } catch (err) {
+      alert(err.message || 'เปลี่ยนชื่อทีมไม่สำเร็จ');
+    }
+  }
+
+  async function handleDeleteTeam(team) {
+    const message =
+      `ลบทีม "${team.team_name}"?\n\n` +
+      `สมาชิก ${team.member_count} คน และจุดตรวจวัด ${team.location_count} จุด จะกลายเป็น "ไม่มีทีม" ` +
+      'สมาชิกเหล่านั้นจะแก้ไขจุดตรวจวัดไม่ได้จนกว่าจะกำหนดทีมใหม่ (จุดตรวจวัดไม่ถูกลบ)';
+    if (!window.confirm(message)) return;
+    try {
+      await deleteTeam(team.id);
+      await load();
+    } catch (err) {
+      alert(err.message || 'ลบทีมไม่สำเร็จ');
+    }
+  }
+
   return (
     <div className="admin-users-page">
       <h1>จัดการผู้ใช้และทีม</h1>
@@ -89,11 +121,44 @@ export function AdminUsersPage() {
       <section className="team-manager">
         <h2>ทีม</h2>
         <ul className="team-list">
-          {teams.map((t) => (
-            <li key={t.id}>
-              {t.team_name} <span className="muted">({t.member_count} คน, {t.location_count} จุด)</span>
-            </li>
-          ))}
+          {teams.map((t) =>
+            editingTeamId === t.id ? (
+              <li key={t.id}>
+                <form className="inline-form" onSubmit={handleRenameTeam}>
+                  <input
+                    type="text"
+                    aria-label={`ชื่อใหม่ของ ${t.team_name}`}
+                    value={editingName}
+                    onChange={(e) => setEditingName(e.target.value)}
+                    autoFocus
+                  />
+                  <button type="submit" className="btn btn--small">
+                    บันทึก
+                  </button>
+                  <button type="button" className="btn btn--small btn--ghost" onClick={() => setEditingTeamId(null)}>
+                    ยกเลิก
+                  </button>
+                </form>
+              </li>
+            ) : (
+              <li key={t.id}>
+                {t.team_name} <span className="muted">({t.member_count} คน, {t.location_count} จุด)</span>
+                <button
+                  type="button"
+                  className="link-button"
+                  onClick={() => {
+                    setEditingTeamId(t.id);
+                    setEditingName(t.team_name);
+                  }}
+                >
+                  เปลี่ยนชื่อ
+                </button>
+                <button type="button" className="link-button link-button--danger" onClick={() => handleDeleteTeam(t)}>
+                  ลบ
+                </button>
+              </li>
+            )
+          )}
         </ul>
         <form className="inline-form" onSubmit={handleCreateTeam}>
           <input

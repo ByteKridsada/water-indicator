@@ -28,7 +28,8 @@ dev server (`npm run dev:pglite` in `../backend`).
 | Route | Page | Notes |
 |---|---|---|
 | `/login`, `/register` | Auth | |
+| `/profile` | Profile | change email and password |
 | `/` | Dashboard | location list, search/team filter, create/delete |
-| `/locations/new`, `/locations/:id/edit` | Location form | place search (Nominatim/OpenStreetMap), map-click pin and typed coordinates, avatar image upload |
-| `/map` | Map | Leaflet markers, popup with small-multiples sparkline charts per indicator, table-view toggle |
-| `/admin/users` | Admin | team creation, team assignment, role/active toggles — admin only |
+| `/locations/new`, `/locations/:id/edit` | Location form | place search (Nominatim/OpenStreetMap), map-click pin and typed coordinates, avatar image upload, manual indicator readings |
+| `/map` | Map | markers showing each location's uploaded image, popup with small-multiples sparkline charts per indicator, table-view toggle |
+| `/admin/users` | Admin | team create/rename/delete, team assignment, role/active toggles — admin only |

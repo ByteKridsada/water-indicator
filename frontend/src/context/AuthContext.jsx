@@ -20,6 +20,12 @@ export function AuthProvider({ children }) {
       .finally(() => setLoading(false));
   }, []);
 
+  useEffect(() => {
+    const handleExpired = () => setUser(null);
+    window.addEventListener('auth:expired', handleExpired);
+    return () => window.removeEventListener('auth:expired', handleExpired);
+  }, []);
+
   const login = useCallback(async (email, password) => {
     const { token, user: loggedInUser } = await authApi.login(email, password);
     localStorage.setItem('token', token);

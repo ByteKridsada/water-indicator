@@ -8,6 +8,7 @@ import { DashboardPage } from './pages/DashboardPage.jsx';
 import { LocationFormPage } from './pages/LocationFormPage.jsx';
 import { MapPage } from './pages/MapPage.jsx';
 import { AdminUsersPage } from './pages/AdminUsersPage.jsx';
+import { ProfilePage } from './pages/ProfilePage.jsx';
 
 export default function App() {
   return (
@@ -26,6 +27,7 @@ export default function App() {
             <Route path="/locations/new" element={<LocationFormPage />} />
             {/* /locations/:id/edit ≈ a route parameter, like a path segment you'd parse from a deep link URL (myapp://locations/42/edit) */}
             <Route path="/locations/:id/edit" element={<LocationFormPage />} />
+            <Route path="/profile" element={<ProfilePage />} />
             <Route element={<AdminRoute />}>
               <Route path="/admin/users" element={<AdminUsersPage />} />
             </Route>

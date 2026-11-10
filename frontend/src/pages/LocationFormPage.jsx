@@ -11,6 +11,7 @@ import {
   uploadLocationImage,
 } from '../api/locations.js';
 import { LocationPicker } from '../components/LocationPicker.jsx';
+import { ReadingForm } from '../components/ReadingForm.jsx';
 
 const emptyForm = {
   team_id: '',
@@ -223,6 +224,8 @@ export function LocationFormPage() {
           </div>
         </fieldset>
       </form>
+
+      {isEdit && canEdit && <ReadingForm locationId={id} />}
     </div>
   );
 }

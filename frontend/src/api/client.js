@@ -17,6 +17,12 @@ apiClient.interceptors.request.use((requestConfig) => {
 apiClient.interceptors.response.use(
   (response) => response,
   (error) => {
+    // A 401 on a request that carried a token means the session expired or the account
+    // was disabled; a 401 without one is just a failed login and must not log anyone out.
+    if (error.response?.status === 401 && error.config?.headers?.Authorization) {
+      localStorage.removeItem('token');
+      window.dispatchEvent(new Event('auth:expired'));
+    }
     const serverMessage = error.response?.data?.error?.message;
     if (serverMessage) {
       error.message = serverMessage;
