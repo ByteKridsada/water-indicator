@@ -18,6 +18,8 @@ export const notFound = (message = 'ไม่พบข้อมูลที่�
 const PG_STATUS = {
   '23505': [409, 'CONFLICT', 'ข้อมูลนี้มีอยู่ในระบบแล้ว'],
   '23503': [409, 'CONFLICT', 'ข้อมูลนี้ถูกอ้างอิงอยู่ จึงดำเนินการไม่ได้'],
+  // PostgreSQL 18+ reports ON DELETE RESTRICT violations as 23001 instead of 23503
+  '23001': [409, 'CONFLICT', 'ข้อมูลนี้ถูกอ้างอิงอยู่ จึงดำเนินการไม่ได้'],
   '23514': [422, 'UNPROCESSABLE', 'ค่าที่ส่งมาอยู่นอกช่วงที่ยอมรับ'],
   '22P02': [400, 'BAD_REQUEST', 'รูปแบบข้อมูลไม่ถูกต้อง']
 };

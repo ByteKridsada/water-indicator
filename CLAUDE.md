@@ -13,7 +13,8 @@ Backend (run in `backend/`; needs a `.env` copied from `.env.example` with `JWT_
 
 ```bash
 npm test             # integration tests on PGlite; no database needed
-npm run dev:pglite   # API on :4000 without Docker/Postgres; data is in memory and lost on restart
+npm run dev:pglite   # API on :4000 without Docker/Postgres; data is in memory and lost on restart.
+                     # The same database is open to pgAdmin/psql at postgres://postgres@127.0.0.1:5433/postgres
 npm run dev          # API against DATABASE_URL
 npm run migrate      # apply schema and seed, create the admin from ADMIN_EMAIL/ADMIN_PASSWORD
 ```
@@ -47,7 +48,7 @@ npm run lint
 - Only return raw `line_user_id` to users who pass `canEditLocation`; list responses expose the boolean `line_linked`.
 - Detect upload types from magic bytes, generate filenames with UUIDs, and serve files through authenticated routes, never a static directory.
 - Use parameterized SQL only. Go through `backend/src/db.js`, which supports both `pg` and PGlite.
-- Tests run on PGlite, so SQL must work on both engines.
+- Tests run on PGlite, so SQL must work on both engines. PGlite is PostgreSQL 18 while `docker-compose.yml` runs 16; error codes can differ between them (RESTRICT violations are `23001` on 18, `23503` on 16).
 
 ## Gotchas
 
@@ -61,4 +62,4 @@ npm run lint
 - `apiClient` moves the server's error message into `err.message`, so pages display that.
 - Hiding UI by role is for usability only; the backend enforces permissions.
 
-Known TOR gaps: custom image markers on the map, the readings entry form and the profile page.
+Known gaps: overlapping map markers aren't clustered, the map lacks the design's time-range and water-type filters, and there are no frontend tests.
