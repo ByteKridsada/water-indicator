@@ -1,9 +1,17 @@
 import { useEffect, useState } from 'react';
+import L from 'leaflet';
 import { MapContainer, Marker, TileLayer, useMap, useMapEvents } from 'react-leaflet';
 import { parseCoordinates, searchPlaces } from '../api/geocode.js';
 
 const DEFAULT_CENTER = [18.7904, 98.9847]; // Chiang Mai, used until a position is picked
 const SEARCH_ZOOM = 15;
+
+const PIN_ICON = L.divIcon({
+  className: 'pick-marker',
+  html: '<svg width="40" height="48" viewBox="0 0 24 29" aria-hidden="true"><path d="M12 28s9-8.1 9-15a9 9 0 1 0-18 0c0 6.9 9 15 9 15Z" fill="#5a56b8" stroke="#ffffff" stroke-width="1.6"></path><circle cx="12" cy="12.5" r="3.4" fill="#ffffff"></circle></svg>',
+  iconSize: [40, 48],
+  iconAnchor: [20, 47],
+});
 
 function ClickHandler({ onPick }) {
   useMapEvents({
@@ -83,12 +91,13 @@ export function LocationPicker({ latitude, longitude, onChange, disabled = false
   }
 
   return (
-    <div className="location-picker">
-      <div className="place-search">
+    <>
+      <div className="field">
         <label htmlFor="place-search-input">ค้นหาสถานที่หรือพิกัด</label>
-        <div className="place-search__row">
+        <div className="search-row">
           <input
             id="place-search-input"
+            className="input"
             type="text"
             placeholder="เช่น ท่าแพ เชียงใหม่ หรือ 18.7904, 98.9847"
             value={query}
@@ -101,43 +110,48 @@ export function LocationPicker({ latitude, longitude, onChange, disabled = false
               }
             }}
           />
-          <button type="button" className="btn" onClick={handleSearch} disabled={searching || !query.trim()}>
+          <button type="button" className="btn btn--accent" onClick={handleSearch} disabled={searching || !query.trim()}>
             {searching ? 'กำลังค้นหา...' : 'ค้นหา'}
           </button>
         </div>
-        {searchError && <p className="form-error">{searchError}</p>}
-        {results && results.length === 0 && (
-          <p className="form-hint">ไม่พบสถานที่นี้ในประเทศไทย ลองเพิ่มชื่อตำบลหรืออำเภอ</p>
-        )}
-        {results && results.length > 0 && (
-          <ul className="place-results">
-            {results.map((place) => (
-              <li key={place.id}>
-                <button type="button" onClick={() => handleSelect(place)}>
-                  {place.name}
-                </button>
-              </li>
-            ))}
-          </ul>
-        )}
       </div>
 
-      <MapContainer center={position || DEFAULT_CENTER} zoom={hasPosition ? 14 : 8} style={{ height: 280, width: '100%' }}>
-        <TileLayer
-          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-        />
-        {position && <Marker position={position} />}
-        {!disabled && <ClickHandler onPick={onChange} />}
-        <FocusOnSearch target={focusTarget} />
-        <KeepPinInView position={position} />
-      </MapContainer>
-      <p className="form-hint">ค้นหาสถานที่ คลิกบนแผนที่เพื่อปักหมุด หรือกรอกพิกัดด้านล่าง</p>
+      {searchError && <p className="form-error">{searchError}</p>}
+      {results && results.length === 0 && (
+        <p className="hint">ไม่พบสถานที่นี้ในประเทศไทย ลองเพิ่มชื่อตำบลหรืออำเภอ</p>
+      )}
+      {results && results.length > 0 && (
+        <ul className="place-results">
+          {results.map((place) => (
+            <li key={place.id}>
+              <button type="button" onClick={() => handleSelect(place)}>
+                {place.name}
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
 
-      <div className="coord-fields">
-        <label>
-          Latitude
+      <div className="picker-map">
+        <MapContainer center={position || DEFAULT_CENTER} zoom={hasPosition ? 14 : 8}>
+          <TileLayer
+            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+          />
+          {position && <Marker position={position} icon={PIN_ICON} />}
+          {!disabled && <ClickHandler onPick={onChange} />}
+          <FocusOnSearch target={focusTarget} />
+          <KeepPinInView position={position} />
+        </MapContainer>
+      </div>
+      <p className="hint">ค้นหาสถานที่ คลิกบนแผนที่เพื่อปักหมุด หรือกรอกพิกัดด้านล่าง</p>
+
+      <div className="grid-2">
+        <div className="field">
+          <label htmlFor="coord-lat">Latitude</label>
           <input
+            id="coord-lat"
+            className="input num"
             type="number"
             step="any"
             min="-90"
@@ -145,10 +159,12 @@ export function LocationPicker({ latitude, longitude, onChange, disabled = false
             value={latitude ?? ''}
             onChange={(e) => onChange(toNumberOrNull(e.target.value), longitude)}
           />
-        </label>
-        <label>
-          Longitude
+        </div>
+        <div className="field">
+          <label htmlFor="coord-lng">Longitude</label>
           <input
+            id="coord-lng"
+            className="input num"
             type="number"
             step="any"
             min="-180"
@@ -156,8 +172,8 @@ export function LocationPicker({ latitude, longitude, onChange, disabled = false
             value={longitude ?? ''}
             onChange={(e) => onChange(latitude, toNumberOrNull(e.target.value))}
           />
-        </label>
+        </div>
       </div>
-    </div>
+    </>
   );
 }

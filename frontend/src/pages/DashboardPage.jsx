@@ -3,15 +3,20 @@ import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
 import { listLocations, deleteLocation } from '../api/locations.js';
 import { listTeams } from '../api/teams.js';
+import { useLocationImages } from '../hooks/useLocationImages.js';
+import { IconCheck, IconChevronRight, IconImage, IconLink, IconPin, IconPlus } from '../components/icons.jsx';
+import { timeAgo } from '../lib/format.js';
 
 export function DashboardPage() {
   const { user } = useAuth();
   const [locations, setLocations] = useState([]);
+  const [total, setTotal] = useState(0);
   const [teams, setTeams] = useState([]);
   const [q, setQ] = useState('');
   const [teamId, setTeamId] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const imageUrls = useLocationImages(locations);
 
   async function load() {
     setLoading(true);
@@ -22,6 +27,7 @@ export function DashboardPage() {
         listTeams(),
       ]);
       setLocations(locationsRes.data);
+      setTotal(locationsRes.meta.total);
       setTeams(teamsRes);
     } catch (err) {
       setError(err.message || 'โหลดข้อมูลไม่สำเร็จ');
@@ -35,86 +41,155 @@ export function DashboardPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  async function handleSearch(e) {
+  function handleSearch(e) {
     e.preventDefault();
     load();
   }
 
-  async function handleDelete(id) {
-    if (!window.confirm('ลบจุดตรวจวัดนี้? ค่าตัวชี้วัดและรูปภาพทั้งหมดของจุดนี้จะถูกลบไปด้วย')) return;
+  async function handleDelete(loc) {
+    if (!window.confirm(`ลบ "${loc.location_name}"? ค่าตัวชี้วัดและรูปภาพทั้งหมดของจุดนี้จะถูกลบไปด้วย`)) return;
     try {
-      await deleteLocation(id);
-      setLocations((prev) => prev.filter((l) => l.id !== id));
+      await deleteLocation(loc.id);
+      setLocations((prev) => prev.filter((l) => l.id !== loc.id));
+      setTotal((n) => n - 1);
     } catch (err) {
       alert(err.message || 'ลบไม่สำเร็จ');
     }
   }
 
+  const linked = locations.filter((l) => l.line_linked).length;
+
   return (
-    <div className="dashboard-page">
-      <div className="page-header">
-        <h1>รายการจุดตรวจวัด</h1>
+    <div className="page">
+      <div className="page-head">
+        <div>
+          <h1 className="page-title">จุดตรวจวัด</h1>
+          <p className="page-sub">สมาชิกในทีมเดียวกันแก้ไขจุดของทีมร่วมกันได้</p>
+        </div>
         <Link to="/locations/new" className="btn btn--primary">
-          + เพิ่มจุดตรวจวัด
+          <IconPlus />
+          เพิ่มจุดตรวจวัดใหม่
         </Link>
       </div>
 
-      <form className="filter-bar" onSubmit={handleSearch}>
-        <input
-          type="text"
-          placeholder="ค้นหาชื่อจุด / ชื่อสมาชิก"
-          value={q}
-          onChange={(e) => setQ(e.target.value)}
-        />
-        <select value={teamId} onChange={(e) => setTeamId(e.target.value)}>
-          <option value="">ทุกทีม</option>
-          {teams.map((t) => (
-            <option key={t.id} value={t.id}>
-              {t.team_name}
-            </option>
-          ))}
-        </select>
-        <button type="submit" className="btn">
+      <section className="stats" aria-label="สรุป">
+        <div className="stat">
+          <span className="stat__icon pill--teal">
+            <IconPin size={22} />
+          </span>
+          <div>
+            <div className="stat__value num">{total}</div>
+            <div className="stat__label">จุดตรวจวัดทั้งหมด</div>
+          </div>
+        </div>
+        <div className="stat">
+          <span className="stat__icon pill--indigo">
+            <IconLink size={22} />
+          </span>
+          <div>
+            <div className="stat__value num">
+              {linked} <span style={{ fontSize: 17, color: 'var(--muted)' }}>/ {locations.length}</span>
+            </div>
+            <div className="stat__label">ผูกบัญชี LINE แล้ว</div>
+          </div>
+        </div>
+      </section>
+
+      <form className="filter-bar" onSubmit={handleSearch} role="search">
+        <div className="field">
+          <label htmlFor="search-q">ค้นหา</label>
+          <input
+            id="search-q"
+            className="input"
+            type="search"
+            placeholder="ชื่อจุด หรือชื่อผู้รับผิดชอบ"
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+          />
+        </div>
+        <div className="field">
+          <label htmlFor="search-team">ทีม</label>
+          <select id="search-team" className="select select--pill" value={teamId} onChange={(e) => setTeamId(e.target.value)}>
+            <option value="">ทุกทีม</option>
+            {teams.map((t) => (
+              <option key={t.id} value={t.id}>
+                {t.team_name}
+              </option>
+            ))}
+          </select>
+        </div>
+        <button type="submit" className="btn btn--accent btn--small" style={{ height: 44 }}>
           ค้นหา
         </button>
       </form>
 
       {error && <p className="form-error">{error}</p>}
-      {loading ? (
-        <p>กำลังโหลด...</p>
-      ) : locations.length === 0 ? (
-        <p className="empty-state">ยังไม่มีจุดตรวจวัด</p>
-      ) : (
-        <div className="location-grid">
-          {locations.map((loc) => (
-            <div key={loc.id} className="location-card">
-              <div className="location-card__header">
-                <h3>{loc.location_name}</h3>
-                {loc.line_linked && <span className="chip chip--line">เชื่อม LINE</span>}
-              </div>
-              <p className="location-card__meta">ผู้รายงาน: {loc.member_name}</p>
-              <p className="location-card__meta">
-                ทีม: {loc.team ? loc.team.team_name : <em>ไม่มีทีม</em>}
-              </p>
-              {loc.meta_data_1 && <p className="location-card__meta">{loc.meta_data_1}</p>}
-              <div className="location-card__actions">
-                <Link to={`/locations/${loc.id}/edit`} className="btn btn--small">
-                  แก้ไข
-                </Link>
-                {user?.role === 'admin' && (
-                  <button
-                    type="button"
-                    className="btn btn--small btn--danger"
-                    onClick={() => handleDelete(loc.id)}
-                  >
-                    ลบ
-                  </button>
-                )}
-              </div>
+
+      <section className="list-card" aria-label="รายการจุดตรวจวัด">
+        {loading ? (
+          <p className="empty-state">กำลังโหลด...</p>
+        ) : locations.length === 0 ? (
+          <p className="empty-state">ยังไม่มีจุดตรวจวัด กด "เพิ่มจุดตรวจวัดใหม่" เพื่อเริ่มต้น</p>
+        ) : (
+          <>
+            <div className="list-row list-row--head locations-row">
+              <span>สถานที่ / ผู้รับผิดชอบ</span>
+              <span>ทีม</span>
+              <span>พิกัด</span>
+              <span>ประเภทแหล่งน้ำ</span>
+              <span>LINE</span>
+              <span>อัปเดตล่าสุด</span>
+              <span />
             </div>
-          ))}
-        </div>
-      )}
+            {locations.map((loc) => (
+              <div key={loc.id} className="list-row locations-row">
+                <div className="cell-main">
+                  <span className="thumb">
+                    {imageUrls[loc.id] ? <img src={imageUrls[loc.id]} alt="" /> : <IconImage size={20} />}
+                  </span>
+                  <div style={{ minWidth: 0 }}>
+                    <div className="cell-title">{loc.location_name}</div>
+                    <div className="cell-sub">{loc.member_name}</div>
+                  </div>
+                </div>
+                <span>
+                  {loc.team ? (
+                    <span className="pill pill--indigo">{loc.team.team_name}</span>
+                  ) : (
+                    <span className="pill pill--neutral">ไม่มีทีม</span>
+                  )}
+                </span>
+                <span className="num cell-sub">
+                  {loc.latitude.toFixed(4)}, {loc.longitude.toFixed(4)}
+                </span>
+                <span>{loc.meta_data_1 ? <span className="pill pill--neutral">{loc.meta_data_1}</span> : '—'}</span>
+                <span>
+                  {loc.line_linked ? (
+                    <span className="pill pill--teal">
+                      <IconCheck size={12} />
+                      ผูกแล้ว
+                    </span>
+                  ) : (
+                    <span className="pill pill--neutral">ยังไม่ผูก</span>
+                  )}
+                </span>
+                <span className="cell-sub">{timeAgo(loc.updated_at)}</span>
+                <div className="cell-actions">
+                  {user?.role === 'admin' && (
+                    <button type="button" className="link-button link-button--danger" onClick={() => handleDelete(loc)}>
+                      ลบ
+                    </button>
+                  )}
+                  <Link to={`/locations/${loc.id}/edit`} className="link-button" style={{ display: 'inline-flex', alignItems: 'center', minHeight: 44 }}>
+                    แก้ไข
+                    <IconChevronRight size={14} />
+                  </Link>
+                </div>
+              </div>
+            ))}
+          </>
+        )}
+      </section>
     </div>
   );
 }

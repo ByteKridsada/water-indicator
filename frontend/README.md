@@ -19,7 +19,9 @@ dev server (`npm run dev:pglite` in `../backend`).
 
 - `src/api/` — one file per backend resource, thin wrappers around a shared `axios` client
 - `src/context/AuthContext.jsx` — JWT session state (token in `localStorage`, user profile in memory)
-- `src/components/` — route guards, shell/nav, the Leaflet location picker, the popup sparkline chart
+- `src/components/` — route guards, the app shell and auth layout, the Leaflet location picker, the sparkline, the readings form, shared icons
+- `src/hooks/useLocationImages.js` — loads location images through the authenticated API as object URLs
+- `src/lib/format.js` — Thai date, relative-time and initials helpers
 - `src/pages/` — one page per route: login, register, dashboard (location list), location
   create/edit form, map view, admin users/teams
 
@@ -31,5 +33,5 @@ dev server (`npm run dev:pglite` in `../backend`).
 | `/profile` | Profile | change email and password |
 | `/` | Dashboard | location list, search/team filter, create/delete |
 | `/locations/new`, `/locations/:id/edit` | Location form | place search (Nominatim/OpenStreetMap), map-click pin and typed coordinates, avatar image upload, manual indicator readings |
-| `/map` | Map | markers showing each location's uploaded image, popup with small-multiples sparkline charts per indicator, table-view toggle |
+| `/map` | Map | image markers, time-range/team/water-type filters, side panel with latest values and sparklines per indicator, history table |
 | `/admin/users` | Admin | team create/rename/delete, team assignment, role/active toggles — admin only |

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
+import { AuthLayout } from '../components/AuthLayout.jsx';
 
 export function RegisterPage() {
   const { register } = useAuth();
@@ -25,34 +26,45 @@ export function RegisterPage() {
   }
 
   return (
-    <div className="auth-page">
-      <form className="auth-card" onSubmit={handleSubmit}>
-        <h1>สมัครสมาชิก</h1>
-        <label>
-          อีเมล
-          <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
-        </label>
-        <label>
-          รหัสผ่าน (อย่างน้อย 8 ตัวอักษร)
+    <AuthLayout title="สมัครสมาชิก" subtitle="สร้างบัญชีเพื่อเข้าร่วมทีมตรวจวัด">
+      <form className="auth-fields" onSubmit={handleSubmit}>
+        <div className="field">
+          <label htmlFor="register-email">อีเมล</label>
           <input
+            id="register-email"
+            className="input"
+            type="email"
+            placeholder="name@example.com"
+            autoComplete="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            required
+          />
+        </div>
+        <div className="field">
+          <label htmlFor="register-password">รหัสผ่าน (อย่างน้อย 8 ตัวอักษร)</label>
+          <input
+            id="register-password"
+            className="input"
             type="password"
+            autoComplete="new-password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             required
             minLength={8}
           />
-        </label>
+        </div>
         {error && <p className="form-error">{error}</p>}
-        <button type="submit" className="btn btn--primary" disabled={submitting}>
+        <button type="submit" className="btn btn--primary" disabled={submitting} style={{ height: 52 }}>
           {submitting ? 'กำลังสมัคร...' : 'สมัครสมาชิก'}
         </button>
-        <p className="form-hint">
-          บัญชีใหม่จะยังไม่ถูกกำหนดทีม — รอแอดมินกำหนดทีมก่อนจึงจะสร้าง/แก้ไขจุดตรวจวัดได้
-        </p>
-        <p className="auth-switch">
-          มีบัญชีอยู่แล้ว? <Link to="/login">เข้าสู่ระบบ</Link>
-        </p>
       </form>
-    </div>
+      <p className="auth-switch">
+        มีบัญชีอยู่แล้ว? <Link to="/login">เข้าสู่ระบบ</Link>
+      </p>
+      <p className="auth-note">
+        บัญชีใหม่จะยังไม่มีทีม ต้องรอแอดมินกำหนดทีมก่อน จึงจะสร้างหรือแก้ไขจุดตรวจวัดได้
+      </p>
+    </AuthLayout>
   );
 }

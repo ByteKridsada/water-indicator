@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useAuth } from '../context/AuthContext.jsx';
 import { changePassword, updateMe } from '../api/auth.js';
+import { initials } from '../lib/format.js';
 
 const ROLE_LABELS = { admin: 'ผู้ดูแลระบบ', member: 'สมาชิก' };
 
@@ -58,23 +59,40 @@ export function ProfilePage() {
   }
 
   return (
-    <div className="form-page profile-page">
-      <h1>ข้อมูลบัญชี</h1>
+    <div className="page" style={{ maxWidth: 720 }}>
+      <div>
+        <h1 className="page-title">ข้อมูลบัญชี</h1>
+        <p className="page-sub">เปลี่ยนอีเมลที่ใช้เข้าสู่ระบบ หรือเปลี่ยนรหัสผ่าน</p>
+      </div>
 
-      <dl className="profile-summary">
-        <dt>บทบาท</dt>
-        <dd>{ROLE_LABELS[user.role] ?? user.role}</dd>
-        <dt>ทีม</dt>
-        <dd>{user.team ? user.team.team_name : 'ยังไม่มีทีม — ติดต่อผู้ดูแลระบบเพื่อกำหนดทีม'}</dd>
-      </dl>
+      <section className="card" aria-label="สรุปบัญชี">
+        <div className="cell-main">
+          <span className="avatar" style={{ width: 56, height: 56, fontSize: 18 }}>
+            {initials(user.email)}
+          </span>
+          <dl className="profile-summary">
+            <dt>บทบาท</dt>
+            <dd>{ROLE_LABELS[user.role] ?? user.role}</dd>
+            <dt>ทีม</dt>
+            <dd>{user.team ? user.team.team_name : 'ยังไม่มีทีม — ติดต่อผู้ดูแลระบบเพื่อกำหนดทีม'}</dd>
+          </dl>
+        </div>
+      </section>
 
-      <form className="location-form" onSubmit={handleEmailSubmit}>
-        <fieldset disabled={emailSaving}>
-          <h3>อีเมล</h3>
-          <label>
-            อีเมลที่ใช้เข้าสู่ระบบ
-            <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
-          </label>
+      <form className="card" onSubmit={handleEmailSubmit}>
+        <fieldset disabled={emailSaving} className="stack" style={{ gap: 16 }}>
+          <h2 className="card-title">อีเมล</h2>
+          <div className="field">
+            <label htmlFor="profile-email">อีเมลที่ใช้เข้าสู่ระบบ</label>
+            <input
+              id="profile-email"
+              className="input"
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
+            />
+          </div>
           {emailError && <p className="form-error">{emailError}</p>}
           {emailSaved && <p className="form-success">เปลี่ยนอีเมลแล้ว ครั้งหน้าให้เข้าสู่ระบบด้วยอีเมลใหม่</p>}
           <div className="form-actions">
@@ -85,41 +103,49 @@ export function ProfilePage() {
         </fieldset>
       </form>
 
-      <form className="location-form" onSubmit={handlePasswordSubmit}>
-        <fieldset disabled={passwordSaving}>
-          <h3>เปลี่ยนรหัสผ่าน</h3>
-          <label>
-            รหัสผ่านปัจจุบัน
+      <form className="card" onSubmit={handlePasswordSubmit}>
+        <fieldset disabled={passwordSaving} className="stack" style={{ gap: 16 }}>
+          <h2 className="card-title">เปลี่ยนรหัสผ่าน</h2>
+          <div className="field">
+            <label htmlFor="profile-current">รหัสผ่านปัจจุบัน</label>
             <input
+              id="profile-current"
+              className="input"
               type="password"
               autoComplete="current-password"
               value={currentPassword}
               onChange={(e) => setCurrentPassword(e.target.value)}
               required
             />
-          </label>
-          <label>
-            รหัสผ่านใหม่ (อย่างน้อย 8 ตัวอักษร)
-            <input
-              type="password"
-              autoComplete="new-password"
-              minLength={8}
-              value={newPassword}
-              onChange={(e) => setNewPassword(e.target.value)}
-              required
-            />
-          </label>
-          <label>
-            ยืนยันรหัสผ่านใหม่
-            <input
-              type="password"
-              autoComplete="new-password"
-              minLength={8}
-              value={confirmPassword}
-              onChange={(e) => setConfirmPassword(e.target.value)}
-              required
-            />
-          </label>
+          </div>
+          <div className="grid-2">
+            <div className="field">
+              <label htmlFor="profile-new">รหัสผ่านใหม่ (อย่างน้อย 8 ตัวอักษร)</label>
+              <input
+                id="profile-new"
+                className="input"
+                type="password"
+                autoComplete="new-password"
+                minLength={8}
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                required
+              />
+            </div>
+            <div className="field">
+              <label htmlFor="profile-confirm">ยืนยันรหัสผ่านใหม่</label>
+              <input
+                id="profile-confirm"
+                className="input"
+                type="password"
+                autoComplete="new-password"
+                minLength={8}
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                required
+              />
+            </div>
+          </div>
           {passwordError && <p className="form-error">{passwordError}</p>}
           {passwordSaved && <p className="form-success">เปลี่ยนรหัสผ่านแล้ว</p>}
           <div className="form-actions">

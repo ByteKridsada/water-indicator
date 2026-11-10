@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { listIndicatorTypes } from '../api/indicatorTypes.js';
 import { createReading, fetchReadings } from '../api/readings.js';
+import { formatDateTime } from '../lib/format.js';
 
 const RECENT_COUNT = 10;
 
@@ -55,13 +56,19 @@ export function ReadingForm({ locationId }) {
   }
 
   return (
-    <section className="reading-form">
-      <h3>บันทึกค่าตัวชี้วัด</h3>
-      <p className="form-hint">ใช้บันทึกค่าที่วัดด้วยมือ ค่าที่ได้จากรูปทาง LINE จะเข้าระบบเอง</p>
-      <form className="reading-form__fields" onSubmit={handleSubmit}>
-        <label>
-          ตัวชี้วัด
-          <select value={typeId} onChange={(e) => setTypeId(e.target.value)} required>
+    <section className="card" aria-labelledby="reading-title">
+      <div>
+        <h2 className="card-title" id="reading-title">
+          บันทึกค่าตัวชี้วัด
+        </h2>
+        <p className="hint" style={{ marginTop: 4 }}>
+          ใช้บันทึกค่าที่วัดด้วยมือ ค่าที่ได้จากรูปทาง LINE จะเข้าระบบเอง
+        </p>
+      </div>
+      <form className="reading-fields" onSubmit={handleSubmit}>
+        <div className="field">
+          <label htmlFor="reading-type">ตัวชี้วัด</label>
+          <select id="reading-type" className="select" value={typeId} onChange={(e) => setTypeId(e.target.value)} required>
             {types.map((t) => (
               <option key={t.id} value={t.id}>
                 {t.name}
@@ -69,15 +76,29 @@ export function ReadingForm({ locationId }) {
               </option>
             ))}
           </select>
-        </label>
-        <label>
-          ค่าที่วัดได้
-          <input type="number" step="any" value={value} onChange={(e) => setValue(e.target.value)} required />
-        </label>
-        <label>
-          วันเวลาที่วัด (ว่างไว้ = ตอนนี้)
-          <input type="datetime-local" value={measuredAt} onChange={(e) => setMeasuredAt(e.target.value)} />
-        </label>
+        </div>
+        <div className="field">
+          <label htmlFor="reading-value">ค่าที่วัดได้</label>
+          <input
+            id="reading-value"
+            className="input num"
+            type="number"
+            step="any"
+            value={value}
+            onChange={(e) => setValue(e.target.value)}
+            required
+          />
+        </div>
+        <div className="field">
+          <label htmlFor="reading-at">วันเวลาที่วัด (ว่างไว้ = ตอนนี้)</label>
+          <input
+            id="reading-at"
+            className="input"
+            type="datetime-local"
+            value={measuredAt}
+            onChange={(e) => setMeasuredAt(e.target.value)}
+          />
+        </div>
         <button type="submit" className="btn btn--primary" disabled={saving || !typeId}>
           {saving ? 'กำลังบันทึก...' : 'บันทึกค่า'}
         </button>
@@ -86,29 +107,31 @@ export function ReadingForm({ locationId }) {
       {saved && <p className="form-success">{saved}</p>}
 
       {recent.length > 0 && (
-        <table className="data-table reading-form__recent">
-          <thead>
-            <tr>
-              <th>วันเวลาที่วัด</th>
-              <th>ตัวชี้วัด</th>
-              <th>ค่า</th>
-              <th>ที่มา</th>
-            </tr>
-          </thead>
-          <tbody>
-            {recent.map((r, i) => (
-              <tr key={`${r.type.id}-${r.measured_at}-${i}`}>
-                <td>{new Date(r.measured_at).toLocaleString('th-TH')}</td>
-                <td>{r.type.name}</td>
-                <td>
-                  {r.value}
-                  {r.type.unit ? ` ${r.type.unit}` : ''}
-                </td>
-                <td>{r.source === 'ai' ? 'แปลผลจากรูป' : 'บันทึกด้วยมือ'}</td>
+        <div className="table-scroll">
+          <table className="data-table reading-recent">
+            <thead>
+              <tr>
+                <th>วันเวลาที่วัด</th>
+                <th>ตัวชี้วัด</th>
+                <th>ค่า</th>
+                <th>ที่มา</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {recent.map((r, i) => (
+                <tr key={`${r.type.id}-${r.measured_at}-${i}`}>
+                  <td>{formatDateTime(r.measured_at)}</td>
+                  <td>{r.type.name}</td>
+                  <td className="num">
+                    {r.value}
+                    {r.type.unit ? ` ${r.type.unit}` : ''}
+                  </td>
+                  <td>{r.source === 'ai' ? 'แปลผลจากรูป' : 'บันทึกด้วยมือ'}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       )}
     </section>
   );

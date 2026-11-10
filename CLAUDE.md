@@ -61,5 +61,6 @@ npm run lint
 - Add API calls in `src/api/<resource>.js` as thin wrappers around `apiClient`. Pages don't call axios directly.
 - `apiClient` moves the server's error message into `err.message`, so pages display that.
 - Hiding UI by role is for usability only; the backend enforces permissions.
+- Styling follows design direction C: tokens at the top of `src/index.css`; teal is the brand and data color, indigo is for interaction and selection. Keep status colors (green, amber, red) out of the UI until water-quality thresholds exist.
 
-Known gaps: overlapping map markers aren't clustered, the map lacks the design's time-range and water-type filters, and there are no frontend tests.
+Known gaps: overlapping map markers aren't clustered, there's no "forgot password" flow, and there are no frontend tests.

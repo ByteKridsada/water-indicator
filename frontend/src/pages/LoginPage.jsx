@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
+import { AuthLayout } from '../components/AuthLayout.jsx';
 
 export function LoginPage() {
   const { login } = useAuth();
@@ -26,31 +27,46 @@ export function LoginPage() {
   }
 
   return (
-    <div className="auth-page">
-      <form className="auth-card" onSubmit={handleSubmit}>
-        <h1>เข้าสู่ระบบ</h1>
-        <label>
-          อีเมล
-          <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
-        </label>
-        <label>
-          รหัสผ่าน
+    <AuthLayout title="ระบบรายงานคุณภาพน้ำ" subtitle="เข้าสู่ระบบเพื่อจัดการจุดตรวจวัด">
+      <form className="auth-fields" onSubmit={handleSubmit}>
+        <div className="field">
+          <label htmlFor="login-email">อีเมล</label>
           <input
+            id="login-email"
+            className="input"
+            type="email"
+            placeholder="name@example.com"
+            autoComplete="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            required
+          />
+        </div>
+        <div className="field">
+          <label htmlFor="login-password">รหัสผ่าน</label>
+          <input
+            id="login-password"
+            className="input"
             type="password"
+            placeholder="••••••••"
+            autoComplete="current-password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             required
             minLength={8}
           />
-        </label>
+        </div>
         {error && <p className="form-error">{error}</p>}
-        <button type="submit" className="btn btn--primary" disabled={submitting}>
+        <button type="submit" className="btn btn--primary" disabled={submitting} style={{ height: 52 }}>
           {submitting ? 'กำลังเข้าสู่ระบบ...' : 'เข้าสู่ระบบ'}
         </button>
-        <p className="auth-switch">
-          ยังไม่มีบัญชี? <Link to="/register">สมัครสมาชิก</Link>
-        </p>
       </form>
-    </div>
+      <p className="auth-switch">
+        ยังไม่มีบัญชี? <Link to="/register">สมัครสมาชิกใหม่</Link>
+      </p>
+      <p className="auth-note">
+        สมาชิกที่ยังไม่ถูกกำหนดทีม จะยังแก้ไขข้อมูลจุดตรวจวัดไม่ได้ จนกว่าแอดมินจะกำหนดทีมให้
+      </p>
+    </AuthLayout>
   );
 }

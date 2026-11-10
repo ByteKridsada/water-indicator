@@ -1,5 +1,7 @@
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
+import { initials } from '../lib/format.js';
+import { IconDrop, IconList, IconLogout, IconMap, IconUsers } from './icons.jsx';
 
 export function Layout() {
   const { user, logout } = useAuth();
@@ -13,28 +15,52 @@ export function Layout() {
   return (
     <div className="app-shell">
       <header className="app-header">
-        <div className="brand">ระบบรายงานคุณภาพน้ำ</div>
-        <nav className="main-nav">
-          <NavLink to="/" end>
-            รายการจุดตรวจวัด
+        <div className="brand">
+          <span className="brand-mark">
+            <IconDrop size={24} />
+          </span>
+          ระบบคุณภาพน้ำ
+        </div>
+
+        <nav className="tabs" aria-label="เมนูหลัก">
+          <NavLink to="/map" className="tab">
+            <IconMap />
+            แผนที่
           </NavLink>
-          <NavLink to="/map">แผนที่</NavLink>
-          {user?.role === 'admin' && <NavLink to="/admin/users">จัดการผู้ใช้</NavLink>}
-        </nav>
-        <div className="user-menu">
-          <NavLink to="/profile" className="user-email" title="ข้อมูลบัญชี">
-            {user?.email}
+          <NavLink to="/" end className="tab">
+            <IconList />
+            จุดตรวจวัด
           </NavLink>
-          {user?.team ? (
-            <span className="team-badge">{user.team.team_name}</span>
-          ) : (
-            <span className="team-badge team-badge--none">ยังไม่มีทีม</span>
+          {user?.role === 'admin' && (
+            <NavLink to="/admin/users" className="tab">
+              <IconUsers />
+              จัดการทีม
+            </NavLink>
           )}
-          <button type="button" className="btn btn--ghost" onClick={handleLogout}>
-            ออกจากระบบ
+        </nav>
+
+        <div className="user-block">
+          <div className="user-block__text">
+            <NavLink to="/profile" className="user-block__email" title="ข้อมูลบัญชี">
+              {user?.email}
+            </NavLink>
+            {user?.team ? (
+              <span className="user-block__team">{user.team.team_name}</span>
+            ) : user?.role === 'admin' ? (
+              <span className="user-block__team">ผู้ดูแลระบบ</span>
+            ) : (
+              <span className="user-block__team user-block__team--none">ยังไม่มีทีม</span>
+            )}
+          </div>
+          <NavLink to="/profile" className="avatar" aria-label="ข้อมูลบัญชี">
+            {initials(user?.email)}
+          </NavLink>
+          <button type="button" className="round-btn" onClick={handleLogout} aria-label="ออกจากระบบ" title="ออกจากระบบ">
+            <IconLogout />
           </button>
         </div>
       </header>
+
       <main className="app-main">
         <Outlet />
       </main>
