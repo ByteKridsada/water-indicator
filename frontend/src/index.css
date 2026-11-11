@@ -119,8 +119,24 @@ textarea {
 
 .input:disabled,
 .select:disabled {
-  background: #f3f7f6;
+  background-color: #f3f7f6;
   color: var(--muted);
+}
+
+/* replace the native arrow, which sits flush against the rounded border */
+.select {
+  appearance: none;
+  -webkit-appearance: none;
+  padding-right: 46px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23566764' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 18px center;
+  background-size: 16px;
+  cursor: pointer;
+}
+
+.select:disabled {
+  cursor: not-allowed;
 }
 
 .select--pill {
@@ -128,7 +144,8 @@ textarea {
   border-radius: 999px;
   width: auto;
   min-width: 160px;
-  padding: 0 14px;
+  padding: 0 42px 0 16px;
+  background-position: right 16px center;
   font-size: 14px;
 }
 
