@@ -1,0 +1,14 @@
+# Keep secrets, local installs and build output out of every image.
+# Images install their own dependencies and receive config through environment variables.
+**/.env
+**/.env.*
+!**/.env.example
+**/node_modules
+**/dist
+**/.DS_Store
+.git
+backend/uploads
+backend/tests
+tmp-test-uploads
+docs
+*.docx

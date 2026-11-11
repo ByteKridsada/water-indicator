@@ -14,14 +14,31 @@ services:
       timeout: 5s
       retries: 10
 
+  # Runs once per `docker compose up`: creates tables on an empty database, applies the
+  # seed (idempotent) and creates the admin account if it doesn't exist yet, then exits.
+  migrate:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    command: ['node', 'src/migrate.js']
+    restart: 'no'
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgres://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD}@db:5432/indicator_map
+      JWT_SECRET: ${JWT_SECRET:?ต้องตั้ง JWT_SECRET ในไฟล์ .env ที่ root}
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
+
   api:
     build:
       context: .
       dockerfile: backend/Dockerfile
     restart: unless-stopped
     depends_on:
-      db:
-        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
     environment:
       PORT: 4000
       DATABASE_URL: postgres://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD}@db:5432/indicator_map
@@ -29,13 +46,22 @@ services:
       JWT_TTL: ${JWT_TTL:-12h}
       UPLOAD_DIR: /app/backend/uploads
       MAX_UPLOAD_BYTES: ${MAX_UPLOAD_BYTES:-5242880}
+      # The browser reaches the API through `web` on the same origin, so CORS isn't used.
       CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:5173}
-      ADMIN_EMAIL: ${ADMIN_EMAIL:-}
-      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
     volumes:
       - uploads:/app/backend/uploads
+    # No published port: only `web` (nginx) talks to the API, over Docker's private network.
+
+  # The only service reachable from outside: built frontend + /api proxy.
+  web:
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+    restart: unless-stopped
+    depends_on:
+      - api
     ports:
-      - '${API_PORT:-4000}:4000'
+      - '${WEB_PORT:-8080}:80'
 
 volumes:
   pgdata:
