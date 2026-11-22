@@ -1301,6 +1301,64 @@ fieldset {
   flex-wrap: wrap;
 }
 
+/* --- modal dialog (native <dialog> opened with showModal) --- */
+
+/* no padding on the element itself, so a click whose target is the <dialog> is a backdrop click */
+.dialog {
+  width: min(560px, calc(100vw - 32px));
+  max-height: calc(100dvh - 32px);
+  padding: 0;
+  border: 0;
+  border-radius: 28px;
+  background: var(--surface);
+  color: var(--ink);
+  box-shadow: var(--shadow-float);
+  overflow: auto;
+  animation: dialog-in 160ms ease-out;
+}
+
+.dialog::backdrop {
+  background: rgba(29, 43, 42, 0.42); /* --ink */
+}
+
+.dialog__body {
+  padding: 26px;
+}
+
+.dialog__header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.dialog__title {
+  font-size: 21px;
+  overflow-wrap: anywhere;
+}
+
+.dialog__sub {
+  font-size: 13.5px;
+  color: var(--muted);
+}
+
+.dialog .select:focus-visible,
+.dialog .input:focus-visible {
+  border-color: var(--indigo);
+}
+
+@keyframes dialog-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dialog {
+    animation: none;
+  }
+}
+
 /* --- small screens --- */
 
 @media (max-width: 900px) {
