@@ -233,21 +233,29 @@ test('แก้เฉพาะชื่อ ไม่กระทบทีม บ
   assert.equal(after.is_active, before.is_active);
 });
 
-test('ชื่อว่างหรือยาวเกิน 100 ตัวอักษร -> 400 ข้อความภาษาไทย', async () => {
-  const blank = await call(`/api/v1/users/${memberA.id}`, {
-    token: adminToken,
-    method: 'PATCH',
-    body: { first_name: '   ' }
-  });
-  assert.equal(blank.status, 400);
-  assert.match(blank.data.error.message, /[ก-๙]/);
-
-  const long = await call(`/api/v1/users/${memberA.id}`, {
-    token: adminToken,
-    method: 'PATCH',
-    body: { last_name: 'ก'.repeat(101) }
-  });
-  assert.equal(long.status, 400);
+test('ชื่อว่างหรือยาวเกิน 100 ตัวอักษร -> 400 ข้อความภาษาไทย และไม่แก้ฟิลด์อื่น', async () => {
+  const isActive = async () => {
+    const list = await call('/api/v1/users?limit=100', { token: adminToken });
+    return list.data.data.find((u) => u.id === memberA.id).is_active;
+  };
+  const before = await isActive();
+  // Pair each invalid name with a valid field so only the name rule can reject it.
+  const invalid = [
+    { first_name: '   ' },
+    { last_name: '   ' },
+    { first_name: 'ก'.repeat(101) },
+    { last_name: 'ก'.repeat(101) }
+  ];
+  for (const bad of invalid) {
+    const res = await call(`/api/v1/users/${memberA.id}`, {
+      token: adminToken,
+      method: 'PATCH',
+      body: { ...bad, is_active: !before }
+    });
+    assert.equal(res.status, 400, JSON.stringify(bad));
+    assert.match(res.data.error.message, /[ก-๙]/);
+    assert.equal(await isActive(), before, 'rejected request must not change is_active');
+  }
 });
 
 test('member แก้ชื่อผู้ใช้ผ่าน PATCH /users/:id ไม่ได้ -> 403', async () => {
