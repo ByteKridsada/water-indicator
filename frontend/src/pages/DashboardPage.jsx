@@ -102,7 +102,7 @@ export function DashboardPage() {
             id="search-q"
             className="input"
             type="search"
-            placeholder="ชื่อจุด หรือชื่อผู้รับผิดชอบ"
+            placeholder="ชื่อจุดตรวจวัด"
             value={q}
             onChange={(e) => setQ(e.target.value)}
           />
@@ -133,7 +133,7 @@ export function DashboardPage() {
         ) : (
           <>
             <div className="list-row list-row--head locations-row">
-              <span>สถานที่ / ผู้รับผิดชอบ</span>
+              <span>สถานที่</span>
               <span>ทีม</span>
               <span>พิกัด</span>
               <span>ประเภทแหล่งน้ำ</span>
@@ -149,7 +149,6 @@ export function DashboardPage() {
                   </span>
                   <div style={{ minWidth: 0 }}>
                     <div className="cell-title">{loc.location_name}</div>
-                    <div className="cell-sub">{loc.member_name}</div>
                   </div>
                 </div>
                 <span>

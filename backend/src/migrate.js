@@ -8,15 +8,47 @@ import { setClient, exec, one } from './db.js';
 const here = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(here, '../..');
 
+const migrationsDir = path.join(repoRoot, 'db/migrations');
+
+async function migrationFiles() {
+  const names = await fs.readdir(migrationsDir).catch(() => []);
+  return names.filter((n) => n.endsWith('.sql')).sort();
+}
+
+// schema.sql always describes the latest schema, so a fresh database gets it whole and every
+// migration is recorded as already applied. A database created earlier gets only the
+// migrations it hasn't run yet.
 async function applySchema() {
+  await exec(`CREATE TABLE IF NOT EXISTS schema_migrations (
+    name        VARCHAR(255) PRIMARY KEY,
+    applied_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+  )`);
+
   const present = await one(`SELECT to_regclass('public.locations') AS reg`);
-  if (present && present.reg) {
-    console.log('schema: tables already exist — skipping');
+  const files = await migrationFiles();
+
+  if (!present || !present.reg) {
+    const sql = await fs.readFile(path.join(repoRoot, 'db/schema.sql'), 'utf8');
+    await exec(sql);
+    for (const name of files) {
+      await one(
+        `INSERT INTO schema_migrations (name) VALUES ($1) ON CONFLICT DO NOTHING RETURNING name`,
+        [name]
+      );
+    }
+    console.log('schema: applied db/schema.sql');
     return;
   }
-  const sql = await fs.readFile(path.join(repoRoot, 'db/schema.sql'), 'utf8');
-  await exec(sql);
-  console.log('schema: applied db/schema.sql');
+
+  console.log('schema: tables already exist — checking migrations');
+  for (const name of files) {
+    const done = await one(`SELECT name FROM schema_migrations WHERE name = $1`, [name]);
+    if (done) continue;
+    const sql = await fs.readFile(path.join(migrationsDir, name), 'utf8');
+    await exec(sql);
+    await one(`INSERT INTO schema_migrations (name) VALUES ($1) RETURNING name`, [name]);
+    console.log(`migration: applied ${name}`);
+  }
 }
 
 async function applySeed() {

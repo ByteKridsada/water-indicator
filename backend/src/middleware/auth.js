@@ -20,7 +20,8 @@ export async function authenticate(req, _res, next) {
 
     // reload the user on every request so role/team/is_active changes take effect immediately
     const user = await one(
-      `SELECT u.id, u.email, u.role, u.team_id, u.is_active, t.team_name
+      `SELECT u.id, u.email, u.first_name, u.last_name, u.role, u.team_id, u.is_active,
+              u.avatar_image_path, u.updated_at, t.team_name
          FROM users u
          LEFT JOIN teams t ON t.id = u.team_id
         WHERE u.id = $1`,

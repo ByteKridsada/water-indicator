@@ -2,7 +2,8 @@ import { useEffect, useState } from 'react';
 import { listUsers, updateUser } from '../api/users.js';
 import { createTeam, deleteTeam, listTeams, renameTeam } from '../api/teams.js';
 import { IconPlus, IconUserPlus } from '../components/icons.jsx';
-import { formatDate, initials } from '../lib/format.js';
+import { displayName, formatDate } from '../lib/format.js';
+import { UserAvatar } from '../components/UserAvatar.jsx';
 
 export function AdminUsersPage() {
   const [users, setUsers] = useState([]);
@@ -209,9 +210,10 @@ export function AdminUsersPage() {
             {users.map((u) => (
               <div key={u.id} className="list-row users-row">
                 <div className="cell-main">
-                  <span className="avatar avatar--small">{initials(u.email)}</span>
+                  <UserAvatar user={u} className="avatar--small" />
                   <div style={{ minWidth: 0 }}>
-                    <div className="cell-title">{u.email}</div>
+                    <div className="cell-title">{displayName(u)}</div>
+                    {u.first_name && <div className="cell-sub">{u.email}</div>}
                     {!u.team && u.role !== 'admin' && (
                       <div className="cell-sub" style={{ color: 'var(--indigo-dark)', fontWeight: 600 }}>
                         ยังไม่มีทีม

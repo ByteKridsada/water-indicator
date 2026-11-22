@@ -46,10 +46,28 @@ async function call(path, { token, method = 'GET', body } = {}) {
   return { status: res.status, data };
 }
 
+const NAMES = { first_name: 'สุชาดา', last_name: 'อินทร' };
+
+const PNG = Buffer.concat([
+  Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+  Buffer.alloc(64, 1)
+]);
+
+async function upload(path, token, buffer, type, filename) {
+  const form = new FormData();
+  form.append('image', new Blob([buffer], { type }), filename);
+  const res = await fetch(base + path, {
+    method: 'POST',
+    headers: { authorization: `Bearer ${token}` },
+    body: form
+  });
+  return { status: res.status, data: await res.json() };
+}
+
 const register = async (email) => {
   const res = await call('/api/v1/auth/register', {
     method: 'POST',
-    body: { email, password: 'password-1234' }
+    body: { email, password: 'password-1234', ...NAMES }
   });
   assert.equal(res.status, 201, JSON.stringify(res.data));
   return { token: res.data.data.token, id: res.data.data.user.id };
@@ -96,7 +114,12 @@ test('register ตั้ง role=member และ team=null เสมอ แม�
   const res = await fetch(base + '/api/v1/auth/register', {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ email: 'sneaky@example.org', password: 'password-1234', role: 'admin' })
+    body: JSON.stringify({
+      email: 'sneaky@example.org',
+      password: 'password-1234',
+      ...NAMES,
+      role: 'admin'
+    })
   });
   const body = await res.json();
   assert.equal(res.status, 201);
@@ -107,9 +130,28 @@ test('register ตั้ง role=member และ team=null เสมอ แม�
 test('email ซ้ำ -> 409', async () => {
   const res = await call('/api/v1/auth/register', {
     method: 'POST',
-    body: { email: 'a@example.org', password: 'password-1234' }
+    body: { email: 'a@example.org', password: 'password-1234', ...NAMES }
   });
   assert.equal(res.status, 409);
+});
+
+test('register ต้องมีชื่อและนามสกุล -> 400 ถ้าไม่มี', async () => {
+  const missing = await call('/api/v1/auth/register', {
+    method: 'POST',
+    body: { email: 'noname@example.org', password: 'password-1234' }
+  });
+  assert.equal(missing.status, 400);
+
+  const blank = await call('/api/v1/auth/register', {
+    method: 'POST',
+    body: { email: 'blank@example.org', password: 'password-1234', first_name: '  ', last_name: 'x' }
+  });
+  assert.equal(blank.status, 400);
+
+  const me = await call('/api/v1/auth/me', { token: memberA.token });
+  assert.equal(me.data.data.first_name, 'สุชาดา');
+  assert.equal(me.data.data.last_name, 'อินทร');
+  assert.equal(me.data.data.avatar_url, null);
 });
 
 test('รหัสผ่านผิด -> 401 และข้อความไม่บอกว่า email มีอยู่จริง', async () => {
@@ -131,7 +173,6 @@ test('สมาชิกที่ยังไม่มีทีม สร้า�
     token: memberA.token,
     method: 'POST',
     body: {
-      member_name: 'สุชาดา อินทร',
       location_name: 'ท่าน้ำบ้านดง',
       latitude: 18.7904,
       longitude: 98.9847
@@ -169,7 +210,6 @@ test('สมาชิกที่มีทีมแล้ว สร้าง loc
     token: memberA.token,
     method: 'POST',
     body: {
-      member_name: 'สุชาดา อินทร',
       location_name: 'ท่าน้ำบ้านดง',
       latitude: 18.7904,
       longitude: 98.9847,
@@ -181,6 +221,7 @@ test('สมาชิกที่มีทีมแล้ว สร้าง loc
   assert.equal(res.data.data.team.id, teamPing);
   assert.equal(res.data.data.meta_data_1, 'แม่น้ำ');
   assert.equal(res.data.data.latitude, 18.7904);
+  assert.equal('member_name' in res.data.data, false);
   locationId = res.data.data.id;
 });
 
@@ -190,7 +231,6 @@ test('สมาชิกส่ง team_id ของทีมอื่น -> 403'
     method: 'POST',
     body: {
       team_id: teamWang,
-      member_name: 'x',
       location_name: 'y',
       latitude: 18,
       longitude: 98
@@ -203,7 +243,7 @@ test('พิกัดนอกช่วง -> 400 ก่อนถึง DB', asy
   const res = await call('/api/v1/locations', {
     token: memberA.token,
     method: 'POST',
-    body: { member_name: 'x', location_name: 'y', latitude: 999, longitude: 98 }
+    body: { location_name: 'y', latitude: 999, longitude: 98 }
   });
   assert.equal(res.status, 400);
   assert.equal(res.data.error.code, 'VALIDATION_FAILED');
@@ -371,6 +411,61 @@ test('อัปโหลดรูป: PNG ผ่าน, ไฟล์ข้อค
   });
   assert.equal(served.status, 200);
   assert.equal(Buffer.from(await served.arrayBuffer()).length, png.length);
+});
+
+test('แก้ชื่อในโปรไฟล์ได้ แต่ส่ง team_id หรือ role มาเองไม่ได้', async () => {
+  const ok = await call('/api/v1/auth/me', {
+    token: memberC.token,
+    method: 'PATCH',
+    body: { first_name: 'มานพ', last_name: 'ใจดี' }
+  });
+  assert.equal(ok.status, 200, JSON.stringify(ok.data));
+  assert.equal(ok.data.data.first_name, 'มานพ');
+  assert.equal(ok.data.data.team.id, teamWang);
+
+  for (const body of [{ team_id: teamPing }, { role: 'admin' }, { first_name: '' }]) {
+    const bad = await call('/api/v1/auth/me', { token: memberC.token, method: 'PATCH', body });
+    assert.equal(bad.status, 400, JSON.stringify(body));
+  }
+
+  const me = await call('/api/v1/auth/me', { token: memberC.token });
+  assert.equal(me.data.data.team.id, teamWang);
+  assert.equal(me.data.data.role, 'member');
+});
+
+test('รูปโปรไฟล์: อัปโหลด/ดู/ลบได้, ตรวจ magic bytes, admin ดูของคนอื่นได้', async () => {
+  const bad = await upload('/api/v1/auth/me/avatar', memberC.token, Buffer.from('not an image'), 'image/png', 'x.png');
+  assert.equal(bad.status, 400);
+
+  const ok = await upload('/api/v1/auth/me/avatar', memberC.token, PNG, 'image/png', 'me.png');
+  assert.equal(ok.status, 200, JSON.stringify(ok.data));
+  assert.match(ok.data.data.avatar_url, /^\/api\/v1\/auth\/me\/avatar\?v=\d+$/);
+
+  const mine = await fetch(base + ok.data.data.avatar_url, {
+    headers: { authorization: `Bearer ${memberC.token}` }
+  });
+  assert.equal(mine.status, 200);
+  assert.equal(Buffer.from(await mine.arrayBuffer()).length, PNG.length);
+
+  // another member's token gets that member's own (missing) avatar, never memberC's
+  const other = await call('/api/v1/auth/me/avatar', { token: memberA.token });
+  assert.equal(other.status, 404);
+
+  const list = await call('/api/v1/users?q=มานพ', { token: adminToken });
+  assert.equal(list.data.meta.total, 1);
+  const adminUrl = list.data.data[0].avatar_url;
+  assert.match(adminUrl, new RegExp(`^/api/v1/users/${memberC.id}/avatar\\?v=\\d+$`));
+  const asAdmin = await fetch(base + adminUrl, { headers: { authorization: `Bearer ${adminToken}` } });
+  assert.equal(asAdmin.status, 200);
+
+  const asMember = await call(`/api/v1/users/${memberC.id}/avatar`, { token: memberA.token });
+  assert.equal(asMember.status, 403);
+
+  const removed = await call('/api/v1/auth/me/avatar', { token: memberC.token, method: 'DELETE' });
+  assert.equal(removed.status, 200);
+  assert.equal(removed.data.data.avatar_url, null);
+  const gone = await call('/api/v1/auth/me/avatar', { token: memberC.token });
+  assert.equal(gone.status, 404);
 });
 
 test('สมาชิกลบ location ไม่ได้ แต่ admin ลบได้', async () => {

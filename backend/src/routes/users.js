@@ -2,11 +2,30 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { many, one } from '../db.js';
 import { notFound } from '../lib/errors.js';
+import { resolveUpload } from '../lib/uploads.js';
 import { requireAdmin } from '../middleware/auth.js';
+import { avatarVersion } from './auth.js';
 
 const router = Router();
 
 router.use(requireAdmin);
+
+const adminView = (r) => ({
+  id: r.id,
+  email: r.email,
+  first_name: r.first_name ?? null,
+  last_name: r.last_name ?? null,
+  role: r.role,
+  is_active: r.is_active,
+  team: r.team_id ? { id: r.team_id, team_name: r.team_name } : null,
+  avatar_url: r.avatar_image_path ? `/api/v1/users/${r.id}/avatar?v=${avatarVersion(r)}` : null,
+  created_at: r.created_at
+});
+
+const ADMIN_SELECT = `SELECT u.id, u.email, u.first_name, u.last_name, u.role, u.is_active,
+              u.created_at, u.updated_at, u.avatar_image_path, u.team_id, t.team_name
+         FROM users u
+         LEFT JOIN teams t ON t.id = u.team_id`;
 
 const listQuery = z.object({
   team_id: z.string().uuid().optional(),
@@ -30,7 +49,11 @@ router.get('/', async (req, res, next) => {
     if (unassigned === 'false') where.push('u.team_id IS NOT NULL');
     if (q) {
       params.push(`%${q}%`);
-      where.push(`u.email ILIKE $${params.length}`);
+      const n = params.length;
+      where.push(
+        `(u.email ILIKE $${n} OR u.first_name ILIKE $${n} OR u.last_name ILIKE $${n}
+          OR (u.first_name || ' ' || u.last_name) ILIKE $${n})`
+      );
     }
 
     const clause = where.length ? `WHERE ${where.join(' AND ')}` : '';
@@ -38,10 +61,7 @@ router.get('/', async (req, res, next) => {
 
     params.push(limit, (page - 1) * limit);
     const rows = await many(
-      `SELECT u.id, u.email, u.role, u.is_active, u.created_at,
-              u.team_id, t.team_name
-         FROM users u
-         LEFT JOIN teams t ON t.id = u.team_id
+      `${ADMIN_SELECT}
          ${clause}
      ORDER BY u.created_at DESC
         LIMIT $${params.length - 1} OFFSET $${params.length}`,
@@ -49,14 +69,7 @@ router.get('/', async (req, res, next) => {
     );
 
     res.json({
-      data: rows.map((r) => ({
-        id: r.id,
-        email: r.email,
-        role: r.role,
-        is_active: r.is_active,
-        team: r.team_id ? { id: r.team_id, team_name: r.team_name } : null,
-        created_at: r.created_at
-      })),
+      data: rows.map(adminView),
       meta: { page, limit, total: total.n }
     });
   } catch (err) {
@@ -87,25 +100,24 @@ router.patch('/:id', async (req, res, next) => {
 
     params.push(req.params.id);
     const updated = await one(
-      `UPDATE users SET ${sets.join(', ')} WHERE id = $${params.length}
-         RETURNING id, email, role, is_active, team_id`,
+      `UPDATE users SET ${sets.join(', ')} WHERE id = $${params.length} RETURNING id`,
       params
     );
     if (!updated) throw notFound('ไม่พบผู้ใช้นี้');
 
-    const team = updated.team_id
-      ? await one(`SELECT id, team_name FROM teams WHERE id = $1`, [updated.team_id])
-      : null;
+    const row = await one(`${ADMIN_SELECT} WHERE u.id = $1`, [updated.id]);
+    res.json({ data: adminView(row) });
+  } catch (err) {
+    next(err);
+  }
+});
 
-    res.json({
-      data: {
-        id: updated.id,
-        email: updated.email,
-        role: updated.role,
-        is_active: updated.is_active,
-        team
-      }
-    });
+router.get('/:id/avatar', async (req, res, next) => {
+  try {
+    const row = await one(`SELECT avatar_image_path FROM users WHERE id = $1`, [req.params.id]);
+    if (!row) throw notFound('ไม่พบผู้ใช้นี้');
+    if (!row.avatar_image_path) throw notFound('ผู้ใช้นี้ยังไม่มีรูปโปรไฟล์');
+    res.sendFile(resolveUpload(row.avatar_image_path));
   } catch (err) {
     next(err);
   }

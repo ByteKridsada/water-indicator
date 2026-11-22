@@ -16,7 +16,6 @@ import { IconChevronLeft, IconImage, IconUpload } from '../components/icons.jsx'
 
 const emptyForm = {
   team_id: '',
-  member_name: '',
   location_name: '',
   latitude: null,
   longitude: null,
@@ -106,7 +105,6 @@ export function LocationFormPage() {
       .then((data) => {
         setForm({
           team_id: data.team?.id || '',
-          member_name: data.member_name,
           location_name: data.location_name,
           latitude: data.latitude,
           longitude: data.longitude,
@@ -136,7 +134,6 @@ export function LocationFormPage() {
     setSaving(true);
     try {
       const payload = {
-        member_name: form.member_name,
         location_name: form.location_name,
         latitude: form.latitude,
         longitude: form.longitude,
@@ -218,33 +215,20 @@ export function LocationFormPage() {
                     required
                   />
                 </div>
-                <div className="grid-2">
-                  <div className="field">
-                    <label htmlFor="loc-member">ชื่อสมาชิกผู้รับผิดชอบ</label>
-                    <input
-                      id="loc-member"
-                      className="input"
-                      type="text"
-                      value={form.member_name}
-                      onChange={(e) => update('member_name', e.target.value)}
-                      required
-                    />
-                  </div>
-                  <div className="field">
-                    <label htmlFor="loc-team">ทีม</label>
-                    {user?.role === 'admin' ? (
-                      <select id="loc-team" className="select" value={form.team_id} onChange={(e) => update('team_id', e.target.value)}>
-                        <option value="">ไม่มีทีม</option>
-                        {teams.map((t) => (
-                          <option key={t.id} value={t.id}>
-                            {t.team_name}
-                          </option>
-                        ))}
-                      </select>
-                    ) : (
-                      <input id="loc-team" className="input" type="text" value={memberTeamName} disabled />
-                    )}
-                  </div>
+                <div className="field">
+                  <label htmlFor="loc-team">ทีมผู้รับผิดชอบ</label>
+                  {user?.role === 'admin' ? (
+                    <select id="loc-team" className="select" value={form.team_id} onChange={(e) => update('team_id', e.target.value)}>
+                      <option value="">ไม่มีทีม</option>
+                      {teams.map((t) => (
+                        <option key={t.id} value={t.id}>
+                          {t.team_name}
+                        </option>
+                      ))}
+                    </select>
+                  ) : (
+                    <input id="loc-team" className="input" type="text" value={memberTeamName} disabled />
+                  )}
                 </div>
                 <div className="field">
                   <label htmlFor="loc-meta">ประเภทแหล่งน้ำ (Meta Data 1)</label>

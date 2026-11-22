@@ -1,14 +1,11 @@
 import { Router } from 'express';
-import fs from 'node:fs/promises';
-import path from 'node:path';
-import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
-import { config } from '../config.js';
 import { many, one } from '../db.js';
 import { AppError, forbidden, notFound } from '../lib/errors.js';
 import { assertCanEditLocation, canEditLocation } from '../lib/authz.js';
 import { requireAdmin } from '../middleware/auth.js';
-import { detectImageType, uploadImage } from '../middleware/upload.js';
+import { uploadImage } from '../middleware/upload.js';
+import { removeUpload, resolveUpload, storeImage } from '../lib/uploads.js';
 
 const router = Router();
 
@@ -18,7 +15,6 @@ const metaData1 = z.string().trim().max(255).nullable().optional();
 
 const createBody = z.object({
   team_id: z.string().uuid().nullable().optional(),
-  member_name: z.string().trim().min(1).max(255),
   location_name: z.string().trim().min(1).max(255),
   latitude: z.coerce.number().min(-90).max(90),
   longitude: z.coerce.number().min(-180).max(180),
@@ -55,20 +51,11 @@ function parseBbox(raw) {
   return { minLng, minLat, maxLng, maxLat };
 }
 
-const resolveUpload = (relative) => {
-  const abs = path.resolve(config.uploadDir, relative);
-  if (abs !== config.uploadDir && !abs.startsWith(config.uploadDir + path.sep)) {
-    throw new AppError(400, 'BAD_PATH', 'เส้นทางไฟล์ไม่ถูกต้อง');
-  }
-  return abs;
-};
-
 // line_user_id is personally identifying — expose it as a boolean in list responses, see docs/api-spec.md §5
 function serialize(row, { includeLineUserId = false } = {}) {
   const out = {
     id: row.id,
     location_name: row.location_name,
-    member_name: row.member_name,
     team: row.team_id ? { id: row.team_id, team_name: row.team_name ?? null } : null,
     latitude: Number(row.latitude),
     longitude: Number(row.longitude),
@@ -124,7 +111,7 @@ router.get('/', async (req, res, next) => {
     }
     if (q) {
       params.push(`%${q}%`);
-      where.push(`(l.location_name ILIKE $${params.length} OR l.member_name ILIKE $${params.length})`);
+      where.push(`l.location_name ILIKE $${params.length}`);
     }
     if (bbox) {
       const { minLng, minLat, maxLng, maxLat } = parseBbox(bbox);
@@ -204,14 +191,13 @@ router.post('/', async (req, res, next) => {
     // created_by_user_id comes from the token only — never accepted from the client
     const created = await one(
       `INSERT INTO locations
-            (team_id, created_by_user_id, member_name, location_name,
+            (team_id, created_by_user_id, location_name,
              latitude, longitude, meta_data_1, line_user_id)
-            VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
+            VALUES ($1,$2,$3,$4,$5,$6,$7)
          RETURNING *`,
       [
         teamId,
         req.user.id,
-        body.member_name,
         body.location_name,
         body.latitude,
         body.longitude,
@@ -242,7 +228,6 @@ router.patch('/:id', async (req, res, next) => {
 
     const fields = [
       'team_id',
-      'member_name',
       'location_name',
       'latitude',
       'longitude',
@@ -284,9 +269,7 @@ router.delete('/:id', requireAdmin, async (req, res, next) => {
     );
     if (!deleted) throw notFound('ไม่พบจุดตรวจวัดนี้');
 
-    if (deleted.avatar_image_path) {
-      await fs.rm(resolveUpload(deleted.avatar_image_path), { force: true });
-    }
+    await removeUpload(deleted.avatar_image_path);
     res.status(204).end();
   } catch (err) {
     next(err);
@@ -299,29 +282,21 @@ router.post('/:id/image', uploadImage, async (req, res, next) => {
     if (!existing) throw notFound('ไม่พบจุดตรวจวัดนี้');
     assertCanEditLocation(req.user, existing);
 
-    if (!req.file) throw new AppError(400, 'NO_FILE', 'ต้องแนบไฟล์ในฟิลด์ image');
-    const kind = detectImageType(req.file.buffer);
-
-    // generate the filename ourselves with a UUID — never use the client-supplied name (prevents path traversal)
-    const relative = path.join('avatars', existing.id, `${randomUUID()}.${kind.ext}`);
-    const absolute = resolveUpload(relative);
-    await fs.mkdir(path.dirname(absolute), { recursive: true });
-    await fs.writeFile(absolute, req.file.buffer);
+    // UUID filename, magic-bytes check and path containment all happen in storeImage
+    const { relative, kind, bytes } = await storeImage(req.file, 'avatars', existing.id);
 
     const updated = await one(
       `UPDATE locations SET avatar_image_path = $1 WHERE id = $2 RETURNING *`,
       [relative, existing.id]
     );
 
-    if (existing.avatar_image_path && existing.avatar_image_path !== relative) {
-      await fs.rm(resolveUpload(existing.avatar_image_path), { force: true });
-    }
+    if (existing.avatar_image_path !== relative) await removeUpload(existing.avatar_image_path);
 
     res.json({
       data: {
         avatar_image_url: `/api/v1/locations/${updated.id}/image`,
         content_type: kind.mime,
-        bytes: req.file.buffer.length
+        bytes
       }
     });
   } catch (err) {
@@ -349,7 +324,7 @@ router.delete('/:id/image', async (req, res, next) => {
     assertCanEditLocation(req.user, existing);
 
     if (existing.avatar_image_path) {
-      await fs.rm(resolveUpload(existing.avatar_image_path), { force: true });
+      await removeUpload(existing.avatar_image_path);
       await one(`UPDATE locations SET avatar_image_path = NULL WHERE id = $1 RETURNING id`, [
         existing.id
       ]);

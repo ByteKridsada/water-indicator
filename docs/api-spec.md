@@ -54,25 +54,34 @@ Query `?page=1&limit=20` (limit สูงสุด 100) ตอบกลับ:
 | POST | `/auth/register` | public | สมัครสมาชิก — สร้าง user ด้วย `role='member'`, `team_id=null` |
 | POST | `/auth/login` | public | คืน JWT |
 | GET | `/auth/me` | authenticated | ข้อมูลบัญชีตนเอง + ทีมที่สังกัด |
-| PATCH | `/auth/me` | authenticated | แก้ไข email ของตนเอง |
+| PATCH | `/auth/me` | authenticated | แก้ไข `email` / `first_name` / `last_name` ของตนเอง (ส่งเฉพาะฟิลด์ที่เปลี่ยน) — ส่ง `team_id` หรือ `role` มา -> 400 |
 | POST | `/auth/me/password` | authenticated | เปลี่ยนรหัสผ่าน (ต้องส่ง `current_password`) |
+| POST | `/auth/me/avatar` | authenticated | อัปโหลดรูปโปรไฟล์ (multipart ฟิลด์ `image`, JPG/PNG/WebP ตรวจจาก magic bytes) คืน user ที่อัปเดตแล้ว |
+| GET | `/auth/me/avatar` | authenticated | ไฟล์รูปโปรไฟล์ของตนเอง — 404 ถ้ายังไม่มี |
+| DELETE | `/auth/me/avatar` | authenticated | ลบรูปโปรไฟล์ คืน user ที่อัปเดตแล้ว |
 
 `POST /auth/register`
 
 ```json
-// request
-{ "email": "suchada@example.org", "password": "••••••••" }
+// request — first_name และ last_name บังคับ (1–100 ตัวอักษร)
+{ "email": "suchada@example.org", "password": "••••••••", "first_name": "สุชาดา", "last_name": "อินทร" }
 
 // 201 response
 {
   "data": {
     "token": "eyJhbGci...",
-    "user": { "id": "uuid", "email": "suchada@example.org", "role": "member", "team": null }
+    "user": {
+      "id": "uuid", "email": "suchada@example.org",
+      "first_name": "สุชาดา", "last_name": "อินทร",
+      "role": "member", "team": null, "avatar_url": null
+    }
   }
 }
 ```
 
-**หมายเหตุสำคัญ:** `role` และ `team_id` **ไม่รับจาก client** ตอน register เสมอ — กำหนดโดย server เท่านั้น ไม่งั้นผู้สมัครจะตั้งตัวเองเป็น admin ได้
+`avatar_url` เป็น `/api/v1/auth/me/avatar?v=<เวลาแก้ไขล่าสุด>` เมื่อมีรูป — `?v=` เปลี่ยนทุกครั้งที่อัปโหลดใหม่ เพื่อไม่ให้ browser ใช้รูปเก่าที่ cache ไว้ บัญชีที่สร้างก่อนมีฟิลด์ชื่อ (รวมถึงแอดมินที่ `migrate` สร้าง) จะมี `first_name`/`last_name` เป็น null จนกว่าจะกรอกในหน้าโปรไฟล์
+
+**หมายเหตุสำคัญ:** `role` และ `team_id` **ไม่รับจาก client** ตอน register เสมอ — กำหนดโดย server เท่านั้น ไม่งั้นผู้สมัครจะตั้งตัวเองเป็น admin ได้ · ทีมเปลี่ยนได้โดยแอดมินเท่านั้น (`PATCH /users/:id`) เพราะทีมเป็นตัวกำหนดว่าสมาชิกแก้ไข location ใดได้
 
 ผู้ใช้ที่ `team_id` เป็น null จะ login ได้ แต่ `canEditLocation` คืน false ทุกกรณี (ดูได้แต่แก้ไม่ได้) จนกว่าแอดมินจะกำหนดทีม
 
@@ -93,8 +102,9 @@ Query `?page=1&limit=20` (limit สูงสุด 100) ตอบกลับ:
 
 | Method | Path | สิทธิ์ | หมายเหตุ |
 |---|---|---|---|
-| GET | `/users` | admin | filter: `?team_id=`, `?unassigned=true`, `?q=` |
-| PATCH | `/users/:id` | admin | กำหนด `team_id` / เปลี่ยน `role` / `is_active` |
+| GET | `/users` | admin | filter: `?team_id=`, `?unassigned=true`, `?q=` (ค้นหาจากอีเมล ชื่อ นามสกุล) — แต่ละคนมี `first_name`, `last_name`, `avatar_url` |
+| PATCH | `/users/:id` | admin | กำหนด `team_id` / เปลี่ยน `role` / `is_active` (แอดมินใช้ endpoint นี้เปลี่ยนทีมของตัวเองจากหน้าโปรไฟล์ด้วย) |
+| GET | `/users/:id/avatar` | admin | ไฟล์รูปโปรไฟล์ของผู้ใช้คนนั้น |
 
 `?unassigned=true` คือ query ที่หน้า Admin ใช้แสดงแบนเนอร์ "มีสมาชิก N คนที่ยังไม่ถูกกำหนดทีม"
 
@@ -124,7 +134,7 @@ Query parameters:
 |---|---|---|
 | `team_id` | uuid | กรองตามทีม |
 | `meta_data_1` | `แม่น้ำ` | กรองตาม Meta Data 1 |
-| `q` | `บ้านดง` | ค้นหาจาก `location_name` / `member_name` |
+| `q` | `บ้านดง` | ค้นหาจาก `location_name` |
 | `bbox` | `98.90,18.70,99.05,18.85` | กรองตามกรอบพิกัดที่มองเห็นบนแผนที่ (`minLng,minLat,maxLng,maxLat`) |
 | `include` | `latest_readings` | แนบค่าตัวชี้วัดล่าสุดของแต่ละ indicator type มาด้วย (หน้าแผนที่ใช้อันนี้) |
 
@@ -135,7 +145,6 @@ Query parameters:
     {
       "id": "uuid",
       "location_name": "ท่าน้ำบ้านดง",
-      "member_name": "สุชาดา อินทร",
       "team": { "id": "uuid", "team_name": "ทีมลุ่มน้ำปิง" },
       "latitude": 18.7904,
       "longitude": 98.9847,
@@ -162,7 +171,6 @@ Query parameters:
 ```json
 {
   "team_id": "uuid",            // optional (nullable ตาม schema)
-  "member_name": "สุชาดา อินทร",
   "location_name": "ท่าน้ำบ้านดง",
   "latitude": 18.7904,
   "longitude": 98.9847,
@@ -174,6 +182,8 @@ Query parameters:
 Validation: `latitude` ต้องอยู่ใน −90..90, `longitude` −180..180 (ตรงกับ CHECK constraint ใน DB — ตรวจทั้งสองชั้น) · `line_user_id` ซ้ำกับจุดอื่น -> 409
 
 Server กำหนด `created_by_user_id` จาก JWT เอง **ไม่รับจาก client**
+
+ไม่มีฟิลด์ `member_name` แล้ว — ผู้รับผิดชอบจุดตรวจวัดแสดงเป็น **ทีม** ของจุดนั้น และชื่อสมาชิกอยู่ในโปรไฟล์ของผู้ใช้ (`first_name`, `last_name`)
 
 สิทธิ์ตอนสร้าง: `role='admin'` ส่ง `team_id` เป็นทีมใดก็ได้ · `role='member'` ส่งได้เฉพาะ `team_id` ของทีมตนเอง (ถ้าส่งทีมอื่น -> 403)
 
@@ -237,6 +247,8 @@ Server กำหนด `created_by_user_id` จาก JWT เอง **ไม่�
 **ไม่มี POST** — ภาพการตรวจวัดเข้าระบบทาง LINE webhook ทางเดียวตาม TOR ข้อ 2.3 (`POST /locations/:id/image` ในข้อ 5 เป็นรูปหมุดบนแผนที่ คนละเรื่องกัน)
 
 ไฟล์ถูกเสิร์ฟผ่าน endpoint นี้เท่านั้น **ไม่ expose โฟลเดอร์ `/uploads` เป็น static path** — ไม่งั้นใครเดา path ถูกก็ดูภาพของจุดอื่นได้โดยไม่ผ่านการตรวจสิทธิ์
+
+ตาราง `images` มี `user_id` (nullable) อยู่คู่กับ `line_user_id` — บันทึกว่าภาพเป็นของบัญชีเว็บคนไหน ถ้าผู้ส่งมีบัญชี ส่วน `line_user_id` ยังเก็บไว้ตามที่ LINE ส่งมาเสมอ · วิธีเลือก `location_id` ให้ภาพแต่ละภาพยังไม่สรุป (ผูกกับข้อ 11 เรื่องการผูก LINE)
 
 ---
 

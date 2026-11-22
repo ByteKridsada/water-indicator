@@ -41,6 +41,10 @@ CREATE TABLE users (
     team_id         UUID REFERENCES teams(id) ON DELETE SET NULL, -- nullable: สมัครก่อน แอดมินกำหนดทีมทีหลัง
     email           VARCHAR(255) NOT NULL UNIQUE,
     password_hash   VARCHAR(255) NOT NULL,
+    -- required at registration; nullable for accounts created before names existed (and the seeded admin)
+    first_name      VARCHAR(100),
+    last_name       VARCHAR(100),
+    avatar_image_path VARCHAR(500),             -- profile image, served only through GET /auth/me/avatar or /users/:id/avatar
     role            user_role NOT NULL DEFAULT 'member',
     is_active       BOOLEAN NOT NULL DEFAULT true,
     created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
@@ -60,7 +64,6 @@ CREATE TABLE locations (
     id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     team_id         UUID REFERENCES teams(id) ON DELETE SET NULL, -- nullable: อนุญาตจุดที่ไม่มีทีม (เช่น บุคคลทั่วไป)
     created_by_user_id UUID REFERENCES users(id) ON DELETE SET NULL, -- audit เท่านั้น, ไม่ unique
-    member_name     VARCHAR(255) NOT NULL,       -- ชื่อผู้รับผิดชอบจุดนี้ ณ ตอนลงทะเบียน (ไม่จำเป็นต้องมี user account)
     location_name   VARCHAR(255) NOT NULL,
     latitude        NUMERIC(10, 7) NOT NULL CHECK (latitude BETWEEN -90 AND 90),
     longitude       NUMERIC(10, 7) NOT NULL CHECK (longitude BETWEEN -180 AND 180),
@@ -98,6 +101,7 @@ CREATE TABLE images (
     id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     location_id     UUID NOT NULL REFERENCES locations(id) ON DELETE CASCADE,
     line_user_id    VARCHAR(255) NOT NULL,      -- เก็บซ้ำไว้ ณ เวลาที่ส่ง เพื่อ audit แม้ location เปลี่ยนการผูกบัญชีในอนาคต
+    user_id         UUID REFERENCES users(id) ON DELETE SET NULL, -- web account the photo belongs to, if the sender has one
     line_message_id VARCHAR(255) UNIQUE,        -- message id จาก LINE webhook ป้องกันบันทึกซ้ำ
     file_path       VARCHAR(500),               -- NULL หลังจากไฟล์ถูกลบตาม retention policy
     status          image_status NOT NULL DEFAULT 'received',
@@ -108,6 +112,7 @@ CREATE TABLE images (
 );
 
 CREATE INDEX idx_images_location_id ON images(location_id);
+CREATE INDEX idx_images_user_id ON images(user_id);
 CREATE INDEX idx_images_expires_at ON images(expires_at) WHERE status <> 'deleted';
 
 -- ------------------------------------------------------------
@@ -175,6 +180,7 @@ CREATE TRIGGER set_updated_at_locations
 --     TEAMS ||--o{ LOCATIONS : "มีจุดตรวจวัด (optional)"
 --     USERS ||--o{ LOCATIONS : "audit: ผู้ลงทะเบียนล่าสุด (optional)"
 --     LOCATIONS ||--o{ IMAGES : "ส่งรูปเข้ามา"
+--     USERS ||--o{ IMAGES : "owner of the photo (optional)"
 --     LOCATIONS ||--o{ INDICATOR_READINGS : "มีค่าตัวชี้วัด"
 --     IMAGES ||--o| AI_IMAGE_RESULTS : "ถูกแปลผลโดย AI"
 --     AI_IMAGE_RESULTS ||--o{ INDICATOR_READINGS : "สร้างค่า indicator"

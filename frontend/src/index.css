@@ -374,6 +374,18 @@ fieldset {
   flex-shrink: 0;
 }
 
+.avatar--image {
+  overflow: hidden;
+  background: var(--surface-soft);
+}
+
+.avatar--image img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
 .avatar--small {
   width: 40px;
   height: 40px;
@@ -1267,6 +1279,26 @@ fieldset {
 
 .profile-summary dd {
   margin: 0;
+}
+
+.profile-photo {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  flex-wrap: wrap;
+}
+
+.profile-photo__actions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  align-items: flex-start;
+}
+
+.profile-photo__actions .btn-row {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
 }
 
 /* --- small screens --- */

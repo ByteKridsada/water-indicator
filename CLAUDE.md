@@ -52,7 +52,8 @@ npm run lint
 
 ## Gotchas
 
-- `migrate.js` skips `schema.sql` once the `locations` table exists, and there are no incremental migrations. A schema change won't reach an existing database without a manual step.
+- `schema.sql` describes the latest schema and is applied only to an empty database. Existing databases get changes from `db/migrations/NNN_*.sql`, which `migrate.js` runs once each and records in `schema_migrations`. For a schema change, edit `schema.sql` and add a new idempotent migration file (`ADD COLUMN IF NOT EXISTS` and the like). Docker runs migrations on every `docker compose up`.
+- Locations have no member name: the responsible party shown is the location's team. Users have `first_name`/`last_name` (required at registration, null on older accounts) and a profile image served through authenticated routes.
 - `docs/api-spec.md` is the design, not the current state. Not implemented yet: the LINE webhook, AI image interpretation, the 24-hour retention job and the `/images` routes (§8–10).
 - `<img src>` can't send the bearer token, so load protected images through `fetchLocationImageUrl`.
 

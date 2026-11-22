@@ -6,6 +6,8 @@ import { AuthLayout } from '../components/AuthLayout.jsx';
 export function RegisterPage() {
   const { register } = useAuth();
   const navigate = useNavigate();
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -16,7 +18,7 @@ export function RegisterPage() {
     setError('');
     setSubmitting(true);
     try {
-      await register(email, password);
+      await register({ email, password, first_name: firstName, last_name: lastName });
       navigate('/', { replace: true });
     } catch (err) {
       setError(err.message || 'สมัครสมาชิกไม่สำเร็จ');
@@ -28,6 +30,34 @@ export function RegisterPage() {
   return (
     <AuthLayout title="สมัครสมาชิก" subtitle="สร้างบัญชีเพื่อเข้าร่วมทีมตรวจวัด">
       <form className="auth-fields" onSubmit={handleSubmit}>
+        <div className="grid-2">
+          <div className="field">
+            <label htmlFor="register-first">ชื่อ</label>
+            <input
+              id="register-first"
+              className="input"
+              type="text"
+              autoComplete="given-name"
+              maxLength={100}
+              value={firstName}
+              onChange={(e) => setFirstName(e.target.value)}
+              required
+            />
+          </div>
+          <div className="field">
+            <label htmlFor="register-last">นามสกุล</label>
+            <input
+              id="register-last"
+              className="input"
+              type="text"
+              autoComplete="family-name"
+              maxLength={100}
+              value={lastName}
+              onChange={(e) => setLastName(e.target.value)}
+              required
+            />
+          </div>
+        </div>
         <div className="field">
           <label htmlFor="register-email">อีเมล</label>
           <input

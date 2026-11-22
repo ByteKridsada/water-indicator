@@ -27,3 +27,20 @@ export function formatDate(value) {
 export function initials(text) {
   return (text || '?').replace(/@.*/, '').slice(0, 2).toUpperCase();
 }
+
+// "First Last", falling back to the email for accounts created before names were required
+export function displayName(user) {
+  const name = [user?.first_name, user?.last_name].filter(Boolean).join(' ');
+  return name || user?.email || '';
+}
+
+// Thai leading vowels (เ แ โ ใ ไ) are written before the consonant they belong to,
+// so skip them: "เกียรติ ใจดี" -> "กจ", not "เใ".
+const firstLetter = (word) => (word || '').trim().replace(/^[เแโใไ]/, '').charAt(0);
+
+export function userInitials(user) {
+  if (user?.first_name) {
+    return (firstLetter(user.first_name) + firstLetter(user.last_name)).toUpperCase();
+  }
+  return initials(user?.email);
+}

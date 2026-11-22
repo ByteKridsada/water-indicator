@@ -33,8 +33,9 @@ export function AuthProvider({ children }) {
     return loggedInUser;
   }, []);
 
-  const register = useCallback(async (email, password) => {
-    const { token, user: newUser } = await authApi.register(email, password);
+  // payload: { email, password, first_name, last_name }
+  const register = useCallback(async (payload) => {
+    const { token, user: newUser } = await authApi.register(payload);
     localStorage.setItem('token', token);
     setUser(newUser);
     return newUser;
@@ -51,8 +52,11 @@ export function AuthProvider({ children }) {
     return me;
   }, []);
 
+  // profile endpoints answer with the updated user, so pages can store it without a refetch
+  const updateUser = useCallback((next) => setUser(next), []);
+
   return (
-    <AuthContext.Provider value={{ user, loading, login, register, logout, refresh }}>
+    <AuthContext.Provider value={{ user, loading, login, register, logout, refresh, updateUser }}>
       {children}
     </AuthContext.Provider>
   );

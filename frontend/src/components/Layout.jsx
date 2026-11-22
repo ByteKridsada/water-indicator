@@ -1,7 +1,8 @@
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
-import { initials } from '../lib/format.js';
+import { displayName } from '../lib/format.js';
 import { IconDrop, IconList, IconLogout, IconMap, IconUsers } from './icons.jsx';
+import { UserAvatar } from './UserAvatar.jsx';
 
 export function Layout() {
   const { user, logout } = useAuth();
@@ -41,8 +42,8 @@ export function Layout() {
 
         <div className="user-block">
           <div className="user-block__text">
-            <NavLink to="/profile" className="user-block__email" title="ข้อมูลบัญชี">
-              {user?.email}
+            <NavLink to="/profile" className="user-block__email" title={user?.email}>
+              {displayName(user)}
             </NavLink>
             {user?.team ? (
               <span className="user-block__team">{user.team.team_name}</span>
@@ -52,9 +53,7 @@ export function Layout() {
               <span className="user-block__team user-block__team--none">ยังไม่มีทีม</span>
             )}
           </div>
-          <NavLink to="/profile" className="avatar" aria-label="ข้อมูลบัญชี">
-            {initials(user?.email)}
-          </NavLink>
+          <UserAvatar as={NavLink} to="/profile" user={user} aria-label="ข้อมูลบัญชี" />
           <button type="button" className="round-btn" onClick={handleLogout} aria-label="ออกจากระบบ" title="ออกจากระบบ">
             <IconLogout />
           </button>

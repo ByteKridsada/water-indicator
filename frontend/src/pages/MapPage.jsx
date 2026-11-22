@@ -71,7 +71,7 @@ function DetailPanel({ location, imageUrl, rangeDays, showTable, onToggleTable, 
           <div style={{ minWidth: 0 }}>
             <h2 className="detail-title">{location.location_name}</h2>
             <p className="cell-sub">
-              {location.member_name}
+              {location.team ? location.team.team_name : 'ไม่มีทีม'}
               {location.meta_data_1 ? ` · ${location.meta_data_1}` : ''}
             </p>
             <p className="cell-sub num" style={{ fontSize: 12 }}>
