@@ -214,6 +214,18 @@ test('admin แก้ชื่อและนามสกุลของผู�
   assert.equal(res.data.data.last_name, 'ใจดี');
 });
 
+test('GET /users แบ่งหน้าทีละ 1 รายการ ได้ผู้ใช้ทุกคนครบ ไม่ซ้ำ', async () => {
+  const first = await call('/api/v1/users?limit=1&page=1', { token: adminToken });
+  const total = first.data.meta.total;
+  const ids = [];
+  for (let page = 1; page <= total; page++) {
+    const r = await call(`/api/v1/users?limit=1&page=${page}`, { token: adminToken });
+    ids.push(...r.data.data.map((u) => u.id));
+  }
+  assert.equal(ids.length, total);
+  assert.equal(new Set(ids).size, total);
+});
+
 test('แก้เฉพาะชื่อ ไม่กระทบทีม บทบาท และสถานะ', async () => {
   const find = async () => {
     const list = await call('/api/v1/users?limit=100', { token: adminToken });

@@ -700,12 +700,12 @@ fieldset {
 
 .users-row {
   grid-template-columns: minmax(240px, 2fr) 130px 120px 120px;
-  min-width: 680px;
+  min-width: 702px;
 }
 
 /* one section per team; the heading band scrolls sideways with the rows on small screens */
 .users-group {
-  min-width: 680px;
+  min-width: 702px;
   border-top: 1px solid var(--line);
 }
 

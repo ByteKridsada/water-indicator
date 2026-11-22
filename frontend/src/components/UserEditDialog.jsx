@@ -45,6 +45,15 @@ export function UserEditDialog({ user, teams, onClose, onSaved }) {
   async function handleSubmit(e) {
     e.preventDefault();
     if (!dirty) return;
+    // the API only reports a generic validation error, so check the changed name fields here
+    if ('first_name' in changes && !String(changes.first_name ?? '').trim()) {
+      setError('กรุณากรอกชื่อ');
+      return;
+    }
+    if ('last_name' in changes && !String(changes.last_name ?? '').trim()) {
+      setError('กรุณากรอกนามสกุล');
+      return;
+    }
     setError('');
     setSaving(true);
     try {

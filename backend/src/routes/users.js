@@ -63,7 +63,7 @@ router.get('/', async (req, res, next) => {
     const rows = await many(
       `${ADMIN_SELECT}
          ${clause}
-     ORDER BY u.created_at DESC
+     ORDER BY u.created_at DESC, u.id
         LIMIT $${params.length - 1} OFFSET $${params.length}`,
       params
     );
