@@ -1,9 +1,13 @@
 import { useEffect, useState } from 'react';
-import { listUsers, updateUser } from '../api/users.js';
+import { listAllUsers } from '../api/users.js';
 import { createTeam, deleteTeam, listTeams, renameTeam } from '../api/teams.js';
 import { IconPlus, IconUserPlus } from '../components/icons.jsx';
 import { displayName, formatDate } from '../lib/format.js';
 import { UserAvatar } from '../components/UserAvatar.jsx';
+import { UserEditDialog } from '../components/UserEditDialog.jsx';
+import { groupUsersByTeam } from '../lib/groupUsers.js';
+
+const ROLE_LABELS = { member: 'สมาชิก', admin: 'ผู้ดูแลระบบ' };
 
 export function AdminUsersPage() {
   const [users, setUsers] = useState([]);
@@ -12,6 +16,10 @@ export function AdminUsersPage() {
   const [newTeamName, setNewTeamName] = useState('');
   const [editingTeamId, setEditingTeamId] = useState(null);
   const [editingName, setEditingName] = useState('');
+  // The selected row ≈ `@State var selectedUserID: UUID?` driving `.sheet(item:)` in SwiftUI:
+  // non-null shows the dialog, null dismisses it. Only the id is stored, and the user is
+  // looked up from `users` on every render so the dialog always sees current data.
+  const [editingUserId, setEditingUserId] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
@@ -19,11 +27,11 @@ export function AdminUsersPage() {
     setLoading(true);
     setError('');
     try {
-      const [usersRes, teamsRes] = await Promise.all([
-        listUsers({ unassigned: unassignedOnly ? true : undefined, limit: 100 }),
+      const [allUsers, teamsRes] = await Promise.all([
+        listAllUsers({ unassigned: unassignedOnly ? true : undefined }),
         listTeams(),
       ]);
-      setUsers(usersRes.data);
+      setUsers(allUsers);
       setTeams(teamsRes);
     } catch (err) {
       setError(err.message || 'โหลดข้อมูลไม่สำเร็จ');
@@ -39,13 +47,34 @@ export function AdminUsersPage() {
 
   const unassignedCount = users.filter((u) => !u.team && u.role !== 'admin').length;
 
+  // With the unassigned filter on, only show groups that have someone in them
+  // (otherwise every team would show up as an empty section).
+  const groups = groupUsersByTeam(users, teams).filter((g) => !unassignedOnly || g.users.length > 0);
+  const editingUser = editingUserId ? users.find((u) => u.id === editingUserId) : null;
+
   // PATCH /users/:id doesn't return created_at, so merge onto the existing row to keep it
-  async function patchUser(userId, payload) {
-    try {
-      const updated = await updateUser(userId, payload);
-      setUsers((prev) => prev.map((u) => (u.id === userId ? { ...u, ...updated } : u)));
-    } catch (err) {
-      alert(err.message || 'อัปเดตไม่สำเร็จ');
+  function handleUserSaved(updated) {
+    const previous = users.find((u) => u.id === updated.id);
+    setUsers((prev) => prev.map((u) => (u.id === updated.id ? { ...u, ...updated } : u)));
+    // keep the team chips' member counts in step when someone moves team
+    const oldTeamId = previous?.team?.id ?? null;
+    const newTeamId = updated.team?.id ?? null;
+    if (oldTeamId !== newTeamId) {
+      setTeams((prev) =>
+        prev.map((t) => {
+          if (t.id === oldTeamId) return { ...t, member_count: Math.max(0, t.member_count - 1) };
+          if (t.id === newTeamId) return { ...t, member_count: t.member_count + 1 };
+          return t;
+        })
+      );
+    }
+  }
+
+  function handleRowKeyDown(e, userId) {
+    // role="button" doesn't get a native button's keyboard behaviour, so add Enter and Space
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      setEditingUserId(userId);
     }
   }
 
@@ -107,7 +136,7 @@ export function AdminUsersPage() {
           </span>
           <div className="banner__text">
             <div className="banner__title">มีสมาชิก {unassignedCount} คนที่ยังไม่ถูกกำหนดทีม</div>
-            <div>เลือกทีมให้แต่ละคนในรายการด้านล่าง ระบบจะบันทึกทันที</div>
+            <div>คลิกที่รายชื่อในรายการด้านล่างเพื่อกำหนดทีมให้แต่ละคน</div>
           </div>
           <button type="button" className="btn btn--accent btn--small" onClick={() => setUnassignedOnly(true)}>
             ดูเฉพาะคนที่ยังไม่มีทีม
@@ -203,62 +232,64 @@ export function AdminUsersPage() {
             <div className="list-row list-row--head users-row">
               <span>ผู้ใช้งาน</span>
               <span>บทบาท</span>
-              <span>ทีม</span>
               <span>สมัครเมื่อ</span>
               <span>สถานะบัญชี</span>
             </div>
-            {users.map((u) => (
-              <div key={u.id} className="list-row users-row">
-                <div className="cell-main">
-                  <UserAvatar user={u} className="avatar--small" />
-                  <div style={{ minWidth: 0 }}>
-                    <div className="cell-title">{displayName(u)}</div>
-                    {u.first_name && <div className="cell-sub">{u.email}</div>}
-                    {!u.team && u.role !== 'admin' && (
-                      <div className="cell-sub" style={{ color: 'var(--indigo-dark)', fontWeight: 600 }}>
-                        ยังไม่มีทีม
+            {groups.map((group) => {
+              const headingId = `users-group-${group.key}`;
+              return (
+                <section key={group.key} className="users-group" aria-labelledby={headingId}>
+                  <h3 className="users-group__head" id={headingId}>
+                    <span>{group.team ? group.team.team_name : 'ไม่มีทีม'}</span>
+                    <span className="users-group__count">{group.users.length} คน</span>
+                  </h3>
+                  {group.users.length === 0 ? (
+                    <p className="users-group__empty">ยังไม่มีสมาชิกในทีมนี้</p>
+                  ) : (
+                    group.users.map((u) => (
+                      <div
+                        key={u.id}
+                        className="list-row users-row users-row--clickable"
+                        role="button"
+                        tabIndex={0}
+                        aria-haspopup="dialog"
+                        aria-label={`แก้ไขข้อมูล ${displayName(u)}`}
+                        onClick={() => setEditingUserId(u.id)}
+                        onKeyDown={(e) => handleRowKeyDown(e, u.id)}
+                      >
+                        <div className="cell-main">
+                          <UserAvatar user={u} className="avatar--small" />
+                          <div style={{ minWidth: 0 }}>
+                            <div className="cell-title">{displayName(u)}</div>
+                            {u.first_name && <div className="cell-sub">{u.email}</div>}
+                          </div>
+                        </div>
+                        <span>{ROLE_LABELS[u.role] ?? u.role}</span>
+                        <span className="cell-sub">{u.created_at ? formatDate(u.created_at) : '—'}</span>
+                        <span>
+                          <span className={`pill ${u.is_active ? 'pill--teal' : 'pill--neutral'}`}>
+                            {u.is_active ? 'ใช้งานได้' : 'ระงับ'}
+                          </span>
+                        </span>
                       </div>
-                    )}
-                  </div>
-                </div>
-                <select
-                  className="select select--pill"
-                  style={{ minWidth: 0, width: '100%' }}
-                  aria-label={`บทบาทของ ${u.email}`}
-                  value={u.role}
-                  onChange={(e) => patchUser(u.id, { role: e.target.value })}
-                >
-                  <option value="member">สมาชิก</option>
-                  <option value="admin">ผู้ดูแลระบบ</option>
-                </select>
-                <select
-                  className="select select--pill"
-                  style={{ minWidth: 0, width: '100%' }}
-                  aria-label={`ทีมของ ${u.email}`}
-                  value={u.team?.id || ''}
-                  onChange={(e) => patchUser(u.id, { team_id: e.target.value || null })}
-                >
-                  <option value="">— ยังไม่กำหนดทีม —</option>
-                  {teams.map((t) => (
-                    <option key={t.id} value={t.id}>
-                      {t.team_name}
-                    </option>
-                  ))}
-                </select>
-                <span className="cell-sub">{u.created_at ? formatDate(u.created_at) : '—'}</span>
-                <label className="checkbox">
-                  <input
-                    type="checkbox"
-                    checked={u.is_active}
-                    onChange={(e) => patchUser(u.id, { is_active: e.target.checked })}
-                  />
-                  {u.is_active ? 'ใช้งานได้' : 'ระงับ'}
-                </label>
-              </div>
-            ))}
+                    ))
+                  )}
+                </section>
+              );
+            })}
           </>
         )}
       </section>
+
+      {editingUser && (
+        <UserEditDialog
+          key={editingUser.id}
+          user={editingUser}
+          teams={teams}
+          onClose={() => setEditingUserId(null)}
+          onSaved={handleUserSaved}
+        />
+      )}
     </div>
   );
 }
