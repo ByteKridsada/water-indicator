@@ -19,8 +19,8 @@ const credentials = z.object({
   password: z.string().min(8, 'รหัสผ่านต้องยาวอย่างน้อย 8 ตัวอักษร').max(200)
 });
 
-const firstName = z.string().trim().min(1, 'กรุณากรอกชื่อ').max(100, 'ชื่อยาวเกิน 100 ตัวอักษร');
-const lastName = z.string().trim().min(1, 'กรุณากรอกนามสกุล').max(100, 'นามสกุลยาวเกิน 100 ตัวอักษร');
+export const firstName = z.string().trim().min(1, 'กรุณากรอกชื่อ').max(100, 'ชื่อยาวเกิน 100 ตัวอักษร');
+export const lastName = z.string().trim().min(1, 'กรุณากรอกนามสกุล').max(100, 'นามสกุลยาวเกิน 100 ตัวอักษร');
 
 const registerBody = credentials.extend({ first_name: firstName, last_name: lastName });
 

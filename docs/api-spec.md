@@ -103,7 +103,7 @@ Query `?page=1&limit=20` (limit สูงสุด 100) ตอบกลับ:
 | Method | Path | สิทธิ์ | หมายเหตุ |
 |---|---|---|---|
 | GET | `/users` | admin | filter: `?team_id=`, `?unassigned=true`, `?q=` (ค้นหาจากอีเมล ชื่อ นามสกุล) — แต่ละคนมี `first_name`, `last_name`, `avatar_url` |
-| PATCH | `/users/:id` | admin | กำหนด `team_id` / เปลี่ยน `role` / `is_active` (แอดมินใช้ endpoint นี้เปลี่ยนทีมของตัวเองจากหน้าโปรไฟล์ด้วย) |
+| PATCH | `/users/:id` | admin | กำหนด `team_id` / เปลี่ยน `role` / `is_active` / แก้ `first_name` / `last_name` (1–100 ตัวอักษร ตัดช่องว่างหัวท้าย) (แอดมินใช้ endpoint นี้เปลี่ยนทีมของตัวเองจากหน้าโปรไฟล์ด้วย) |
 | GET | `/users/:id/avatar` | admin | ไฟล์รูปโปรไฟล์ของผู้ใช้คนนั้น |
 
 `?unassigned=true` คือ query ที่หน้า Admin ใช้แสดงแบนเนอร์ "มีสมาชิก N คนที่ยังไม่ถูกกำหนดทีม"

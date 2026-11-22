@@ -203,6 +203,62 @@ test('admin กำหนดทีมให้สมาชิก และ ?unass
   assert.equal(after.data.meta.total, before.data.meta.total - 3);
 });
 
+test('admin แก้ชื่อและนามสกุลของผู้ใช้ได้', async () => {
+  const res = await call(`/api/v1/users/${memberC.id}`, {
+    token: adminToken,
+    method: 'PATCH',
+    body: { first_name: '  สมชาย ', last_name: 'ใจดี' }
+  });
+  assert.equal(res.status, 200, JSON.stringify(res.data));
+  assert.equal(res.data.data.first_name, 'สมชาย');
+  assert.equal(res.data.data.last_name, 'ใจดี');
+});
+
+test('แก้เฉพาะชื่อ ไม่กระทบทีม บทบาท และสถานะ', async () => {
+  const find = async () => {
+    const list = await call('/api/v1/users?limit=100', { token: adminToken });
+    return list.data.data.find((u) => u.id === memberA.id);
+  };
+  const before = await find();
+  const res = await call(`/api/v1/users/${memberA.id}`, {
+    token: adminToken,
+    method: 'PATCH',
+    body: { first_name: 'ชื่อใหม่' }
+  });
+  assert.equal(res.status, 200, JSON.stringify(res.data));
+  const after = await find();
+  assert.equal(after.first_name, 'ชื่อใหม่');
+  assert.deepEqual(after.team, before.team);
+  assert.equal(after.role, before.role);
+  assert.equal(after.is_active, before.is_active);
+});
+
+test('ชื่อว่างหรือยาวเกิน 100 ตัวอักษร -> 400 ข้อความภาษาไทย', async () => {
+  const blank = await call(`/api/v1/users/${memberA.id}`, {
+    token: adminToken,
+    method: 'PATCH',
+    body: { first_name: '   ' }
+  });
+  assert.equal(blank.status, 400);
+  assert.match(blank.data.error.message, /[ก-๙]/);
+
+  const long = await call(`/api/v1/users/${memberA.id}`, {
+    token: adminToken,
+    method: 'PATCH',
+    body: { last_name: 'ก'.repeat(101) }
+  });
+  assert.equal(long.status, 400);
+});
+
+test('member แก้ชื่อผู้ใช้ผ่าน PATCH /users/:id ไม่ได้ -> 403', async () => {
+  const res = await call(`/api/v1/users/${memberA.id}`, {
+    token: memberA.token,
+    method: 'PATCH',
+    body: { first_name: 'แฮก' }
+  });
+  assert.equal(res.status, 403);
+});
+
 let locationId;
 
 test('สมาชิกที่มีทีมแล้ว สร้าง location ได้ และ meta_data_1 ถูกเก็บ', async () => {

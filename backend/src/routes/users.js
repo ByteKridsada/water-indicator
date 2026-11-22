@@ -4,7 +4,7 @@ import { many, one } from '../db.js';
 import { notFound } from '../lib/errors.js';
 import { resolveUpload } from '../lib/uploads.js';
 import { requireAdmin } from '../middleware/auth.js';
-import { avatarVersion } from './auth.js';
+import { avatarVersion, firstName, lastName } from './auth.js';
 
 const router = Router();
 
@@ -79,6 +79,8 @@ router.get('/', async (req, res, next) => {
 
 const patchBody = z
   .object({
+    first_name: firstName.optional(),
+    last_name: lastName.optional(),
     team_id: z.string().uuid().nullable().optional(),
     role: z.enum(['admin', 'member']).optional(),
     is_active: z.boolean().optional()
@@ -91,7 +93,7 @@ router.patch('/:id', async (req, res, next) => {
     const sets = [];
     const params = [];
 
-    for (const field of ['team_id', 'role', 'is_active']) {
+    for (const field of ['first_name', 'last_name', 'team_id', 'role', 'is_active']) {
       if (field in body) {
         params.push(body[field]);
         sets.push(`${field} = $${params.length}`);
