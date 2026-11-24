@@ -1,7 +1,11 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import L from 'leaflet';
 import { MapContainer, Marker, TileLayer, useMap } from 'react-leaflet';
+import { useLeafletContext } from '@react-leaflet/core';
+import MarkerClusterGroup from 'react-leaflet-cluster';
+// transition rules for cluster zoom/spiderfy animations; the cluster look itself is ours (.loc-cluster)
+import 'leaflet.markercluster/dist/MarkerCluster.css';
 import { listLocations } from '../api/locations.js';
 import { listTeams } from '../api/teams.js';
 import { fetchReadings } from '../api/readings.js';
@@ -24,6 +28,52 @@ function markerIcon(imageUrl, selected) {
     iconAnchor: [25, 25],
   });
 }
+
+// One pin. The icon is memoised per pin so selecting a pin only swaps ITS icon: the Marker element
+// stays alive, which keeps a spiderfied (fanned-out) group open instead of rebuilding the cluster.
+function LocationMarker({ loc, imageUrl, selected, onSelect }) {
+  const icon = useMemo(() => markerIcon(imageUrl, selected), [imageUrl, selected]);
+  const markerRef = useRef(null);
+  // The group is this marker's layer container. Redraw only the bubbles that contain THIS pin when
+  // its selected state changes: a full refreshClusters() would also collapse an open fan.
+  const { layerContainer } = useLeafletContext();
+  useEffect(() => {
+    if (markerRef.current) layerContainer?.refreshClusters?.(markerRef.current);
+  }, [layerContainer, selected]);
+  // A fresh [lat, lng] array on every render makes react-leaflet call setLatLng, which the cluster
+  // group treats as "this pin moved" and answers by closing an open fan. Keep the array stable.
+  const position = useMemo(() => [loc.latitude, loc.longitude], [loc.latitude, loc.longitude]);
+  return (
+    <Marker
+      ref={markerRef}
+      position={position}
+      title={loc.location_name}
+      icon={icon}
+      zIndexOffset={selected ? 1000 : 0}
+      eventHandlers={{ click: () => onSelect(loc.id) }}
+    />
+  );
+}
+
+// A group of nearby pins collapses into one numbered bubble; clicking it zooms in, and pins that
+// share the exact same spot fan out ("spiderfy"). A bubble that hides the selected pin shows the
+// same indigo ring; we read that from the pin's current icon class (setIcon keeps it up to date).
+const isSelectedPin = (marker) => Boolean(marker.options.icon?.options?.className?.includes('loc-marker--selected'));
+
+function clusterIcon(cluster) {
+  const count = cluster.getChildCount();
+  const hasSelected = cluster.getAllChildMarkers().some(isSelectedPin);
+  const size = count < 10 ? 46 : count < 50 ? 54 : 62;
+  return L.divIcon({
+    className: `loc-cluster${hasSelected ? ' loc-cluster--selected' : ''}`,
+    html: `<span title="${count} จุดตรวจวัด คลิกเพื่อขยาย">${count}</span>`,
+    iconSize: [size, size],
+  });
+}
+
+// the pins are 50px wide, so group anything closer than about one pin and a bit
+const CLUSTER_RADIUS = 60;
+const prefersReducedMotion = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
 function FitToLocations({ locations }) {
   const map = useMap();
@@ -273,16 +323,23 @@ export function MapPage() {
             url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
           />
           <FitToLocations locations={visible} />
-          {visible.map((loc) => (
-            <Marker
-              key={`${loc.id}-${loc.id === selectedId}-${Boolean(imageUrls[loc.id])}`}
-              position={[loc.latitude, loc.longitude]}
-              title={loc.location_name}
-              icon={markerIcon(imageUrls[loc.id], loc.id === selectedId)}
-              zIndexOffset={loc.id === selectedId ? 1000 : 0}
-              eventHandlers={{ click: () => select(loc.id) }}
-            />
-          ))}
+          <MarkerClusterGroup
+            iconCreateFunction={clusterIcon}
+            maxClusterRadius={CLUSTER_RADIUS}
+            showCoverageOnHover={false}
+            chunkedLoading
+            animate={!prefersReducedMotion()}
+          >
+            {visible.map((loc) => (
+              <LocationMarker
+                key={loc.id}
+                loc={loc}
+                imageUrl={imageUrls[loc.id]}
+                selected={loc.id === selectedId}
+                onSelect={select}
+              />
+            ))}
+          </MarkerClusterGroup>
         </MapContainer>
         {!loading && visible.length === 0 && <div className="map-empty">ไม่มีจุดตรวจวัดตามตัวกรองนี้</div>}
 

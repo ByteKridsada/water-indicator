@@ -1221,6 +1221,35 @@ fieldset {
   }
 }
 
+/* a bubble standing in for several nearby pins (react-leaflet-cluster) */
+.loc-cluster {
+  background: none;
+  border: 0;
+}
+
+.loc-cluster span {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  border: 3px solid #ffffff;
+  background: var(--teal);
+  color: #ffffff;
+  font-family: var(--font-display);
+  font-size: 16px;
+  font-weight: 600;
+  box-shadow: 0 6px 16px rgba(29, 43, 42, 0.22);
+  cursor: pointer;
+}
+
+/* the bubble hides the selected pin: same indigo ring the pin itself uses */
+.loc-cluster--selected span {
+  border-color: var(--indigo);
+  box-shadow: 0 0 0 7px rgba(90, 86, 184, 0.25), 0 8px 20px rgba(29, 43, 42, 0.25);
+}
+
 .pick-marker {
   background: none;
   border: 0;
