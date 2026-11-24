@@ -4,7 +4,7 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { config } from '../config.js';
 import { many, one } from '../db.js';
-import { notFound } from '../lib/errors.js';
+import { AppError, notFound } from '../lib/errors.js';
 import { resolveUpload } from '../lib/uploads.js';
 import { requireAdmin } from '../middleware/auth.js';
 import { avatarVersion, firstName, lastName } from './auth.js';
@@ -104,11 +104,25 @@ router.patch('/:id', async (req, res, next) => {
     }
 
     params.push(req.params.id);
+    // The system must always keep at least one active admin. When this update could take an
+    // admin away (demote, or deactivate), the guard lives in the UPDATE's own WHERE clause so the
+    // check and the write are one statement: it only matches if the target isn't an active admin
+    // right now, or some other active admin exists.
+    const losesAdmin = body.role === 'member' || body.is_active === false;
+    const guard = losesAdmin
+      ? `AND (u.role <> 'admin' OR NOT u.is_active
+              OR EXISTS (SELECT 1 FROM users o WHERE o.role = 'admin' AND o.is_active AND o.id <> u.id))`
+      : '';
     const updated = await one(
-      `UPDATE users SET ${sets.join(', ')} WHERE id = $${params.length} RETURNING id`,
+      `UPDATE users u SET ${sets.join(', ')} WHERE u.id = $${params.length} ${guard} RETURNING u.id`,
       params
     );
-    if (!updated) throw notFound('ไม่พบผู้ใช้นี้');
+    if (!updated) {
+      // either no such user, or the guard blocked the change
+      const exists = await one(`SELECT 1 AS ok FROM users WHERE id = $1`, [req.params.id]);
+      if (!exists) throw notFound('ไม่พบผู้ใช้นี้');
+      throw new AppError(409, 'LAST_ADMIN', 'ต้องมีผู้ดูแลระบบที่ใช้งานได้อย่างน้อย 1 คน จึงลดบทบาทหรือระงับคนนี้ไม่ได้');
+    }
 
     const row = await one(`${ADMIN_SELECT} WHERE u.id = $1`, [updated.id]);
     res.json({ data: adminView(row) });

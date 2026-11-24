@@ -3,7 +3,7 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { z } from 'zod';
 import { config } from '../config.js';
-import { one } from '../db.js';
+import { many, one } from '../db.js';
 import { AppError } from '../lib/errors.js';
 import { authenticate } from '../middleware/auth.js';
 import { rateLimit } from '../middleware/rateLimit.js';
@@ -100,6 +100,25 @@ router.post('/login', rateLimit({ max: 10 }), async (req, res, next) => {
     }
 
     res.json({ data: { token: signToken(row), user: publicUser(row) } });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// Public on purpose: the "forgot password" page shows who to contact, and the visitor can't log in.
+// Returns the emails of up to MAX_ADMIN_CONTACTS active admins (oldest accounts first so the
+// list stays stable) and nothing else. Empty list if there is no active admin.
+const MAX_ADMIN_CONTACTS = 3;
+router.get('/admin-contacts', rateLimit({ max: 30 }), async (_req, res, next) => {
+  try {
+    const rows = await many(
+      `SELECT email FROM users
+        WHERE role = 'admin' AND is_active
+        ORDER BY created_at, id
+        LIMIT $1`,
+      [MAX_ADMIN_CONTACTS]
+    );
+    res.json({ data: { emails: rows.map((r) => r.email) } });
   } catch (err) {
     next(err);
   }

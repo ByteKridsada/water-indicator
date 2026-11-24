@@ -968,6 +968,34 @@ fieldset {
   line-height: 1.7;
 }
 
+.auth-contacts {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 14px 18px;
+  border: 1.5px solid var(--field-border);
+  border-radius: 16px;
+}
+
+.auth-contacts__title {
+  font-size: 14px;
+}
+
+.auth-contacts ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.auth-contacts a {
+  font-weight: 600;
+  color: var(--indigo-dark);
+  overflow-wrap: anywhere;
+}
+
 .auth-note {
   font-size: 13px;
   color: var(--muted);

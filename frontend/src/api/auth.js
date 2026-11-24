@@ -11,6 +11,12 @@ export async function login(email, password) {
   return data.data;
 }
 
+// Public: emails of up to 3 active admins, for the "forgot password" page. Resolves to string[].
+export async function fetchAdminContacts() {
+  const { data } = await apiClient.get('/auth/admin-contacts');
+  return data.data.emails;
+}
+
 export async function fetchMe() {
   const { data } = await apiClient.get('/auth/me');
   return data.data;

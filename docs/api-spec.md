@@ -53,6 +53,7 @@ Query `?page=1&limit=20` (limit สูงสุด 100) ตอบกลับ:
 |---|---|---|---|
 | POST | `/auth/register` | public | สมัครสมาชิก — สร้าง user ด้วย `role='member'`, `team_id=null` |
 | POST | `/auth/login` | public | คืน JWT |
+| GET | `/auth/admin-contacts` | public | อีเมลของแอดมินที่ใช้งานได้ 1–3 คน (สมัครเก่าสุดก่อน) สำหรับหน้า "ลืมรหัสผ่าน?" คืน `{ "data": { "emails": [...] } }` เท่านั้น ไม่มีข้อมูลอื่น `emails` ว่างถ้าไม่มีแอดมินที่ใช้งานได้ จำกัด 30 ครั้ง/15 นาทีต่อ IP |
 | GET | `/auth/me` | authenticated | ข้อมูลบัญชีตนเอง + ทีมที่สังกัด |
 | PATCH | `/auth/me` | authenticated | แก้ไข `email` / `first_name` / `last_name` ของตนเอง (ส่งเฉพาะฟิลด์ที่เปลี่ยน) — ส่ง `team_id` หรือ `role` มา -> 400 |
 | POST | `/auth/me/password` | authenticated | เปลี่ยนรหัสผ่าน (ต้องส่ง `current_password`) |
@@ -103,7 +104,7 @@ Query `?page=1&limit=20` (limit สูงสุด 100) ตอบกลับ:
 | Method | Path | สิทธิ์ | หมายเหตุ |
 |---|---|---|---|
 | GET | `/users` | admin | filter: `?team_id=`, `?unassigned=true`, `?q=` (ค้นหาจากอีเมล ชื่อ นามสกุล) — แต่ละคนมี `first_name`, `last_name`, `avatar_url` |
-| PATCH | `/users/:id` | admin | กำหนด `team_id` / เปลี่ยน `role` / `is_active` / แก้ `first_name` / `last_name` (1–100 ตัวอักษร ตัดช่องว่างหัวท้าย) (แอดมินใช้ endpoint นี้เปลี่ยนทีมของตัวเองจากหน้าโปรไฟล์ด้วย) |
+| PATCH | `/users/:id` | admin | กำหนด `team_id` / เปลี่ยน `role` / `is_active` / แก้ `first_name` / `last_name` (1–100 ตัวอักษร ตัดช่องว่างหัวท้าย) (แอดมินใช้ endpoint นี้เปลี่ยนทีมของตัวเองจากหน้าโปรไฟล์ด้วย) **ต้องเหลือแอดมินที่ใช้งานได้อย่างน้อย 1 คนเสมอ** — ถ้าการลดบทบาทเป็น `member` หรือระงับ (`is_active:false`) จะทำให้ไม่เหลือแอดมินที่ใช้งานได้ -> 409 `LAST_ADMIN` (แอดมินที่ถูกระงับไม่นับเป็นแอดมินอีกคน) |
 | POST | `/users/:id/reset-password` | admin | ออกรหัสผ่านชั่วคราวให้ผู้ใช้ที่ลืมรหัสผ่าน (ไม่มีการส่งอีเมล) ไม่ต้องมี body คืน `{ "data": { "temporary_password": "..." } }` (12 ตัวอักษร ไม่มีตัวที่หน้าตาคล้ายกัน) **ครั้งเดียว** พร้อม `Cache-Control: no-store` แอดมินส่งต่อให้ผู้ใช้เอง แล้วผู้ใช้เปลี่ยนรหัสที่ `POST /auth/me/password` ไม่ทำให้ token เดิมหมดอายุ และไม่เปิดใช้บัญชีที่ถูกระงับ |
 | GET | `/users/:id/avatar` | admin | ไฟล์รูปโปรไฟล์ของผู้ใช้คนนั้น |
 

@@ -672,3 +672,101 @@ test('บัญชีที่ถูกระงับ: รีเซ็ตได
   const attempt = await login('reset6@example.org', res.data.data.temporary_password);
   assert.equal(attempt.status, 403);
 });
+
+// ---------- last-admin protection (PATCH /users/:id) ----------
+const patchUser = (id, body) =>
+  call(`/api/v1/users/${id}`, { token: adminToken, method: 'PATCH', body });
+const userRow = async (id) =>
+  (await call('/api/v1/users?limit=100', { token: adminToken })).data.data.find((u) => u.id === id);
+
+let originalAdminId;
+test('setup: id of the seeded admin', async () => {
+  const me = await call('/api/v1/auth/me', { token: adminToken });
+  originalAdminId = me.data.data.id;
+});
+
+test('แอดมินคนสุดท้ายถูกลดบทบาทหรือระงับไม่ได้ (409 ข้อความภาษาไทย) และข้อมูลไม่เปลี่ยน', async () => {
+  for (const body of [{ role: 'member' }, { is_active: false }, { role: 'member', is_active: false }]) {
+    const res = await patchUser(originalAdminId, body);
+    assert.equal(res.status, 409, JSON.stringify(body));
+    assert.equal(res.data.error.code, 'LAST_ADMIN');
+    assert.match(res.data.error.message, /[ก-๙]/);
+    const row = await userRow(originalAdminId);
+    assert.equal(row.role, 'admin');
+    assert.equal(row.is_active, true);
+  }
+});
+
+test('แอดมินคนสุดท้ายยังแก้ชื่อและทีมได้ตามปกติ', async () => {
+  const res = await patchUser(originalAdminId, { first_name: 'ผู้ดูแล', is_active: true, role: 'admin' });
+  assert.equal(res.status, 200, JSON.stringify(res.data));
+  assert.equal(res.data.data.first_name, 'ผู้ดูแล');
+});
+
+test('มีแอดมินที่ใช้งานได้อีกคน -> ลดบทบาทหรือระงับแอดมินอีกคนได้', async () => {
+  const x = await register('lastadmin-x@example.org');
+  assert.equal((await patchUser(x.id, { role: 'admin' })).status, 200);
+  assert.equal((await patchUser(x.id, { role: 'member' })).status, 200);
+  assert.equal((await patchUser(x.id, { role: 'admin' })).status, 200);
+  assert.equal((await patchUser(x.id, { is_active: false })).status, 200);
+});
+
+test('แอดมินที่ถูกระงับไม่นับเป็น "แอดมินอีกคน"', async () => {
+  const y = await register('lastadmin-y@example.org');
+  await patchUser(y.id, { role: 'admin' });
+  await patchUser(y.id, { is_active: false });
+  // y is an inactive admin, so the seeded admin is still the only active one
+  const res = await patchUser(originalAdminId, { role: 'member' });
+  assert.equal(res.status, 409);
+});
+
+test('PATCH ผู้ใช้ที่ไม่มีอยู่ยังได้ 404 (ไม่ใช่ 409)', async () => {
+  const res = await patchUser('3f2c9a54-6b1e-4d0a-9c75-2d8e1f4b7a10', { role: 'member' });
+  assert.equal(res.status, 404);
+});
+
+// ---------- GET /auth/admin-contacts (public) ----------
+test('admin-contacts: ไม่ต้อง login ได้อีเมลแอดมิน 1 คนขึ้นไปและไม่เกิน 3 คน มีแต่ emails', async () => {
+  const res = await call('/api/v1/auth/admin-contacts');
+  assert.equal(res.status, 200, JSON.stringify(res.data));
+  assert.deepEqual(Object.keys(res.data.data), ['emails']);
+  const { emails } = res.data.data;
+  assert.ok(emails.length >= 1 && emails.length <= 3);
+  assert.ok(emails.includes('admin@example.org'));
+});
+
+test('admin-contacts: มีแอดมินเกิน 3 คน -> ได้ 3 คนที่สมัครเก่าสุดก่อน และไม่รวมคนที่ถูกระงับ', async () => {
+  const d = await register('contacts-d@example.org');
+  // fixed created_at so the order does not depend on how fast the tests run (the paging test also ties them all)
+  const stamp = async (email, ts) => pglite.query('UPDATE users SET created_at = $1 WHERE email = $2', [ts, email]);
+  await stamp('admin@example.org', '2020-01-01T00:00:00Z');
+  await stamp('a@example.org', '2020-01-02T00:00:00Z');
+  await stamp('b@example.org', '2020-01-03T00:00:00Z');
+  await stamp('c@example.org', '2020-01-04T00:00:00Z');
+  await stamp('contacts-d@example.org', '2020-01-05T00:00:00Z');
+  // memberB was deactivated by an earlier test, so activate everyone we promote
+  for (const m of [memberA, memberB, memberC, d]) {
+    assert.equal((await patchUser(m.id, { role: 'admin', is_active: true })).status, 200);
+  }
+
+  const first = await call('/api/v1/auth/admin-contacts');
+  assert.deepEqual(first.data.data.emails, ['admin@example.org', 'a@example.org', 'b@example.org']);
+
+  // deactivate a: an inactive admin must be skipped, so c takes the third slot
+  assert.equal((await patchUser(memberA.id, { is_active: false })).status, 200);
+  const second = await call('/api/v1/auth/admin-contacts');
+  assert.deepEqual(second.data.data.emails, ['admin@example.org', 'b@example.org', 'c@example.org']);
+
+  // put everyone back as they were: members, and memberB deactivated again
+  for (const m of [memberA, memberB, memberC, d]) {
+    await patchUser(m.id, { role: 'member', is_active: m !== memberB });
+  }
+});
+
+test('admin-contacts: ไม่มีแอดมินที่ใช้งานได้ -> emails ว่าง ไม่ error', async () => {
+  await pglite.query(`UPDATE users SET is_active = false WHERE role = 'admin'`);
+  const res = await call('/api/v1/auth/admin-contacts');
+  await pglite.query(`UPDATE users SET is_active = true WHERE role = 'admin'`);
+  assert.equal(res.status, 200);
+  assert.deepEqual(res.data.data.emails, []);
+});
