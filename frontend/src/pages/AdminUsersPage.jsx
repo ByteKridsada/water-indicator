@@ -5,11 +5,13 @@ import { IconPlus, IconUserPlus } from '../components/icons.jsx';
 import { displayName, formatDate } from '../lib/format.js';
 import { UserAvatar } from '../components/UserAvatar.jsx';
 import { UserEditDialog } from '../components/UserEditDialog.jsx';
+import { useAuth } from '../context/AuthContext.jsx';
 import { groupUsersByTeam } from '../lib/groupUsers.js';
 
 const ROLE_LABELS = { member: 'สมาชิก', admin: 'ผู้ดูแลระบบ' };
 
 export function AdminUsersPage() {
+  const { user: currentUser, refresh } = useAuth();
   const [users, setUsers] = useState([]);
   const [teams, setTeams] = useState([]);
   const [unassignedOnly, setUnassignedOnly] = useState(false);
@@ -54,6 +56,9 @@ export function AdminUsersPage() {
 
   // PATCH /users/:id doesn't return created_at, so merge onto the existing row to keep it
   function handleUserSaved(updated) {
+    // An admin editing their own account changes what the session knows about them (name, role),
+    // so reload it from /auth/me; otherwise the header stays stale and a self-demotion keeps the admin UI.
+    if (updated.id === currentUser?.id) refresh().catch(() => {});
     const previous = users.find((u) => u.id === updated.id);
     setUsers((prev) => prev.map((u) => (u.id === updated.id ? { ...u, ...updated } : u)));
     // keep the team chips' member counts in step when someone moves team

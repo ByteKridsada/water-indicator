@@ -214,7 +214,9 @@ test('admin แก้ชื่อและนามสกุลของผู�
   assert.equal(res.data.data.last_name, 'ใจดี');
 });
 
-test('GET /users แบ่งหน้าทีละ 1 รายการ ได้ผู้ใช้ทุกคนครบ ไม่ซ้ำ', async () => {
+test('GET /users แบ่งหน้าทีละ 1 รายการ ได้ผู้ใช้ทุกคนครบ ไม่ซ้ำ แม้ created_at ซ้ำกัน', async () => {
+  // Force every created_at to tie so only the `u.id` tie-breaker decides the order.
+  await pglite.query(`UPDATE users SET created_at = '2024-01-01T00:00:00Z'`);
   const first = await call('/api/v1/users?limit=1&page=1', { token: adminToken });
   const total = first.data.meta.total;
   const ids = [];
@@ -224,6 +226,7 @@ test('GET /users แบ่งหน้าทีละ 1 รายการ ไ�
   }
   assert.equal(ids.length, total);
   assert.equal(new Set(ids).size, total);
+  assert.deepEqual(ids, [...ids].sort(), 'ties on created_at must fall back to id order');
 });
 
 test('แก้เฉพาะชื่อ ไม่กระทบทีม บทบาท และสถานะ', async () => {

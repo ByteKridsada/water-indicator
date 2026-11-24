@@ -16,7 +16,9 @@ export function AuthProvider({ children }) {
     authApi
       .fetchMe()
       .then(setUser)
-      .catch(() => localStorage.removeItem('token'))
+      // Only a 401 means the token is bad, and apiClient already removes it in that case.
+      // Any other failure (network blip, API restarting) keeps the token so a reload can retry.
+      .catch(() => {})
       .finally(() => setLoading(false));
   }, []);
 
