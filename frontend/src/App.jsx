@@ -4,6 +4,7 @@ import { ProtectedRoute, AdminRoute } from './components/ProtectedRoute.jsx';
 import { Layout } from './components/Layout.jsx';
 import { LoginPage } from './pages/LoginPage.jsx';
 import { RegisterPage } from './pages/RegisterPage.jsx';
+import { ForgotPasswordPage } from './pages/ForgotPasswordPage.jsx';
 import { DashboardPage } from './pages/DashboardPage.jsx';
 import { LocationFormPage } from './pages/LocationFormPage.jsx';
 import { MapPage } from './pages/MapPage.jsx';
@@ -18,6 +19,7 @@ export default function App() {
         {/* <Route path="..." element={<X />} /> ≈ a case in a switch/router that says "if the URL path matches this, show this View." Instead of pushing/popping view controllers */}
         <Route path="/login" element={<LoginPage />} />
         <Route path="/register" element={<RegisterPage />} />
+        <Route path="/forgot-password" element={<ForgotPasswordPage />} />
 
         {/* ProtectedRoute / AdminRoute ≈ these are guard components, not screens themselves. */}
         <Route element={<ProtectedRoute />}>

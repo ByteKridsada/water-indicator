@@ -56,6 +56,9 @@ export function LoginPage() {
             minLength={8}
           />
         </div>
+        <Link className="auth-forgot" to="/forgot-password">
+          ลืมรหัสผ่าน?
+        </Link>
         {error && <p className="form-error">{error}</p>}
         <button type="submit" className="btn btn--primary" disabled={submitting} style={{ height: 52 }}>
           {submitting ? 'กำลังเข้าสู่ระบบ...' : 'เข้าสู่ระบบ'}
