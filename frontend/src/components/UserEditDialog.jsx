@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { updateUser } from '../api/users.js';
 import { displayName, formatDate } from '../lib/format.js';
+import { ResetPasswordPanel } from './ResetPasswordPanel.jsx';
 import { UserAvatar } from './UserAvatar.jsx';
 
 // Admin edit form for one user, shown in a native modal <dialog>.
@@ -164,6 +165,9 @@ export function UserEditDialog({ user, teams, onClose, onSaved }) {
           </div>
         </fieldset>
       </form>
+
+      {/* outside the edit form: it acts on its own and doesn't depend on Save/dirty state */}
+      <ResetPasswordPanel user={user} />
     </dialog>
   );
 }

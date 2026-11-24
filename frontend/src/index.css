@@ -1391,6 +1391,33 @@ fieldset {
   color: var(--muted);
 }
 
+.dialog__section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin: 0 26px;
+  padding: 22px 0 26px;
+  border-top: 1px solid var(--line);
+}
+
+.dialog__section-title {
+  font-size: 15px;
+}
+
+.reset-result {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.reset-result__field {
+  font-family: var(--font-mono);
+  font-size: 16px;
+  letter-spacing: 0.04em;
+  flex: 1;
+  min-width: 0;
+}
+
 .dialog .select:focus-visible,
 .dialog .input:focus-visible {
   border-color: var(--indigo);

@@ -26,3 +26,10 @@ export async function listAllUsers({ unassigned, q } = {}) {
   }
   return all;
 }
+
+// Admin-only: issue a temporary password for someone who forgot theirs.
+// The server returns the plaintext once; keep it in component state only and never store it.
+export async function resetUserPassword(id) {
+  const { data } = await apiClient.post(`/users/${id}/reset-password`);
+  return data.data.temporary_password;
+}
