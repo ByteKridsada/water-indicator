@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import L from 'leaflet';
 import { MapContainer, Marker, TileLayer, useMap } from 'react-leaflet';
@@ -11,7 +11,7 @@ import { listTeams } from '../api/teams.js';
 import { fetchReadings } from '../api/readings.js';
 import { useLocationImages } from '../hooks/useLocationImages.js';
 import { Sparkline } from '../components/Sparkline.jsx';
-import { IconClose, IconImage, IconPin } from '../components/icons.jsx';
+import { IconClose, IconImage } from '../components/icons.jsx';
 import { formatDateTime } from '../lib/format.js';
 
 const DEFAULT_CENTER = [18.7904, 98.9847];
@@ -80,10 +80,26 @@ function FitToLocations({ locations }) {
   useEffect(() => {
     if (locations.length === 0) return;
     const bounds = L.latLngBounds(locations.map((loc) => [loc.latitude, loc.longitude]));
-    // on wide screens the detail panel covers the map's right side, so keep markers out from under it
-    const panelWidth = map.getSize().x > 900 ? 460 : 60;
-    map.fitBounds(bounds, { paddingTopLeft: [60, 60], paddingBottomRight: [panelWidth, 60], maxZoom: 13 });
+    // the detail panel is hidden until a pin is selected, so the whole map is free to fit
+    map.fitBounds(bounds, { padding: [60, 60], maxZoom: 13 });
   }, [map, locations]);
+  return null;
+}
+
+// On wide screens the detail panel floats over the map's right edge (410px wide + 18px inset).
+// When a pin is selected and sits under where the panel will be, pan the map so the pin stays visible.
+const PANEL_FOOTPRINT = 410 + 18 + 18;
+const PANEL_GAP = 70;
+const isStackedLayout = () => window.matchMedia('(max-width: 900px)').matches; // panel sits below the map
+
+function KeepSelectedClearOfPanel({ location }) {
+  const map = useMap();
+  useEffect(() => {
+    if (!location || isStackedLayout()) return;
+    const point = map.latLngToContainerPoint([location.latitude, location.longitude]);
+    const limit = map.getSize().x - PANEL_FOOTPRINT - PANEL_GAP;
+    if (point.x > limit) map.panBy([point.x - limit, 0], { animate: !prefersReducedMotion() });
+  }, [map, location]);
   return null;
 }
 
@@ -179,8 +195,13 @@ function DetailPanel({ location, imageUrl, rangeDays, showTable, onToggleTable, 
   );
 }
 
-function HistoryTable({ location, rangeDays }) {
+function HistoryTable({ location, rangeDays, onLoaded }) {
   const [rows, setRows] = useState(null);
+
+  // tell the parent once the rows are on screen, so it can scroll to the full-height table
+  useEffect(() => {
+    if (rows !== null) onLoaded?.();
+  }, [rows, onLoaded]);
 
   useEffect(() => {
     fetchReadings(location.id, { from: sinceDays(rangeDays) })
@@ -266,6 +287,31 @@ export function MapPage() {
   const selected = visible.find((l) => l.id === selectedId) || null;
   const imageUrls = useLocationImages(locations);
 
+  // Scroll the page to what the user just asked for. Deferred to an effect because the element
+  // only exists after the render that shows it.
+  const panelRef = useRef(null);
+  const tableRef = useRef(null);
+  const scrollBehavior = () => (prefersReducedMotion() ? 'auto' : 'smooth');
+  useEffect(() => {
+    // narrow screens stack the panel under the map, where it would appear off-screen
+    if (selectedId && isStackedLayout()) panelRef.current?.scrollIntoView({ behavior: scrollBehavior(), block: 'start' });
+  }, [selectedId]);
+  // "view as table": scroll once now, and once more when the rows have loaded. While it still says
+  // "loading" the table is short, so the page can't scroll far enough to put its top in view.
+  // The second scroll only happens for the first load after opening, so switching the date range
+  // with the table open doesn't yank the page back down.
+  const scrollTableAfterLoad = useRef(false);
+  const scrollToTable = () => tableRef.current?.scrollIntoView({ behavior: scrollBehavior(), block: 'start' });
+  useEffect(() => {
+    scrollTableAfterLoad.current = showTable;
+    if (showTable) scrollToTable();
+  }, [showTable]);
+  const handleTableLoaded = useCallback(() => {
+    if (!scrollTableAfterLoad.current) return;
+    scrollTableAfterLoad.current = false;
+    tableRef.current?.scrollIntoView({ behavior: prefersReducedMotion() ? 'auto' : 'smooth', block: 'start' });
+  }, []);
+
   function select(id) {
     setSelectedId(id);
     setShowTable(false);
@@ -323,6 +369,7 @@ export function MapPage() {
             url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
           />
           <FitToLocations locations={visible} />
+          <KeepSelectedClearOfPanel location={selected} />
           <MarkerClusterGroup
             iconCreateFunction={clusterIcon}
             maxClusterRadius={CLUSTER_RADIUS}
@@ -343,8 +390,9 @@ export function MapPage() {
         </MapContainer>
         {!loading && visible.length === 0 && <div className="map-empty">ไม่มีจุดตรวจวัดตามตัวกรองนี้</div>}
 
-        <aside className="detail-panel" aria-label="รายละเอียดจุดตรวจวัด" aria-live="polite">
-          {selected ? (
+        {/* no pin selected -> no panel at all, so the map gets the whole card */}
+        {selected && (
+          <aside ref={panelRef} className="detail-panel" aria-label="รายละเอียดจุดตรวจวัด">
             <DetailPanel
               location={selected}
               imageUrl={imageUrls[selected.id]}
@@ -353,19 +401,15 @@ export function MapPage() {
               onToggleTable={() => setShowTable((v) => !v)}
               onClose={() => select(null)}
             />
-          ) : (
-            <div className="detail-hint">
-              <span className="thumb">
-                <IconPin size={28} />
-              </span>
-              <h2 style={{ fontSize: 18, color: 'var(--ink)' }}>เลือกจุดตรวจวัดบนแผนที่</h2>
-              <p>คลิกหมุดเพื่อดูค่าตัวชี้วัดล่าสุด กราฟแนวโน้ม และข้อมูลย้อนหลังของจุดนั้น</p>
-            </div>
-          )}
-        </aside>
+          </aside>
+        )}
       </section>
 
-      {selected && showTable && <HistoryTable location={selected} rangeDays={rangeDays} />}
+      {selected && showTable && (
+        <div ref={tableRef} className="history-anchor">
+          <HistoryTable location={selected} rangeDays={rangeDays} onLoaded={handleTableLoaded} />
+        </div>
+      )}
     </div>
   );
 }

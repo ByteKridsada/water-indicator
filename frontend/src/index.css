@@ -1087,6 +1087,22 @@ fieldset {
   gap: 14px;
   overflow-y: auto;
   box-shadow: var(--shadow-float);
+  scroll-margin-top: 12px;
+  /* appears when a pin is selected: motion that answers the click */
+  animation: detail-panel-in 160ms ease-out;
+}
+
+@keyframes detail-panel-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .detail-panel {
+    animation: none;
+  }
 }
 
 .detail-panel__handle {
@@ -1162,23 +1178,9 @@ fieldset {
   flex: 1;
 }
 
-.detail-hint {
-  margin: auto 0;
-  text-align: center;
-  color: var(--muted);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 10px;
-  padding: 24px 8px;
-}
-
-.detail-hint .thumb {
-  width: 64px;
-  height: 64px;
-  border-radius: 22px;
-  background: var(--indigo-tint);
-  color: var(--indigo);
+/* the history table below the map: leave a little air above it when "view as table" scrolls to it */
+.history-anchor {
+  scroll-margin-top: 16px;
 }
 
 /* map markers (Leaflet divIcon) */
