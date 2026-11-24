@@ -104,6 +104,7 @@ Query `?page=1&limit=20` (limit สูงสุด 100) ตอบกลับ:
 |---|---|---|---|
 | GET | `/users` | admin | filter: `?team_id=`, `?unassigned=true`, `?q=` (ค้นหาจากอีเมล ชื่อ นามสกุล) — แต่ละคนมี `first_name`, `last_name`, `avatar_url` |
 | PATCH | `/users/:id` | admin | กำหนด `team_id` / เปลี่ยน `role` / `is_active` / แก้ `first_name` / `last_name` (1–100 ตัวอักษร ตัดช่องว่างหัวท้าย) (แอดมินใช้ endpoint นี้เปลี่ยนทีมของตัวเองจากหน้าโปรไฟล์ด้วย) |
+| POST | `/users/:id/reset-password` | admin | ออกรหัสผ่านชั่วคราวให้ผู้ใช้ที่ลืมรหัสผ่าน (ไม่มีการส่งอีเมล) ไม่ต้องมี body คืน `{ "data": { "temporary_password": "..." } }` (12 ตัวอักษร ไม่มีตัวที่หน้าตาคล้ายกัน) **ครั้งเดียว** พร้อม `Cache-Control: no-store` แอดมินส่งต่อให้ผู้ใช้เอง แล้วผู้ใช้เปลี่ยนรหัสที่ `POST /auth/me/password` ไม่ทำให้ token เดิมหมดอายุ และไม่เปิดใช้บัญชีที่ถูกระงับ |
 | GET | `/users/:id/avatar` | admin | ไฟล์รูปโปรไฟล์ของผู้ใช้คนนั้น |
 
 `?unassigned=true` คือ query ที่หน้า Admin ใช้แสดงแบนเนอร์ "มีสมาชิก N คนที่ยังไม่ถูกกำหนดทีม"
