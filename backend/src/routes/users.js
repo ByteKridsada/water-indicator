@@ -1,5 +1,8 @@
+import { randomInt } from 'node:crypto';
+import bcrypt from 'bcryptjs';
 import { Router } from 'express';
 import { z } from 'zod';
+import { config } from '../config.js';
 import { many, one } from '../db.js';
 import { notFound } from '../lib/errors.js';
 import { resolveUpload } from '../lib/uploads.js';
@@ -109,6 +112,38 @@ router.patch('/:id', async (req, res, next) => {
 
     const row = await one(`${ADMIN_SELECT} WHERE u.id = $1`, [updated.id]);
     res.json({ data: adminView(row) });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// No 0/O/o, 1/l/I: the admin reads this out loud or types it into a chat.
+const TEMP_PASSWORD_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789';
+const TEMP_PASSWORD_LENGTH = 12;
+
+function generateTemporaryPassword() {
+  let out = '';
+  for (let i = 0; i < TEMP_PASSWORD_LENGTH; i++) {
+    out += TEMP_PASSWORD_ALPHABET[randomInt(TEMP_PASSWORD_ALPHABET.length)];
+  }
+  return out;
+}
+
+// Forgot-password flow without email: the admin issues a temporary password and hands it over.
+// The plaintext is returned once here and never stored or logged. Existing tokens stay valid
+// and a deactivated account stays deactivated.
+router.post('/:id/reset-password', async (req, res, next) => {
+  try {
+    const temporaryPassword = generateTemporaryPassword();
+    const hash = await bcrypt.hash(temporaryPassword, config.bcryptRounds);
+    const updated = await one(`UPDATE users SET password_hash = $1 WHERE id = $2 RETURNING id`, [
+      hash,
+      req.params.id
+    ]);
+    if (!updated) throw notFound('ไม่พบผู้ใช้นี้');
+
+    res.set('Cache-Control', 'no-store');
+    res.json({ data: { temporary_password: temporaryPassword } });
   } catch (err) {
     next(err);
   }

@@ -583,3 +583,92 @@ test('บัญชีที่ถูกระงับใช้งานไม�
   const res = await call('/api/v1/auth/me', { token: memberB.token });
   assert.equal(res.status, 403);
 });
+
+// ---------- POST /users/:id/reset-password ----------
+const login = (email, password) =>
+  call('/api/v1/auth/login', { method: 'POST', body: { email, password } });
+const resetPassword = (id, token = adminToken) =>
+  call(`/api/v1/users/${id}/reset-password`, { token, method: 'POST' });
+
+test('admin รีเซ็ตรหัสผ่าน: ได้รหัสชั่วคราว 12 ตัว รหัสเก่าใช้ไม่ได้ รหัสใหม่ใช้ได้', async () => {
+  const user = await register('reset1@example.org');
+  assert.equal((await login('reset1@example.org', 'password-1234')).status, 200);
+
+  const res = await resetPassword(user.id);
+  assert.equal(res.status, 200, JSON.stringify(res.data));
+  const temp = res.data.data.temporary_password;
+  assert.equal(typeof temp, 'string');
+  assert.equal(temp.length, 12);
+  assert.match(temp, /^[A-HJ-NP-Za-km-np-z2-9]{12}$/, 'no look-alike characters');
+
+  assert.equal((await login('reset1@example.org', 'password-1234')).status, 401);
+  assert.equal((await login('reset1@example.org', temp)).status, 200);
+});
+
+test('รีเซ็ตรหัสผ่านไม่กระทบทีม บทบาท และสถานะ', async () => {
+  const user = await register('reset2@example.org');
+  await call(`/api/v1/users/${user.id}`, {
+    token: adminToken,
+    method: 'PATCH',
+    body: { team_id: teamPing }
+  });
+  const find = async () => {
+    const list = await call('/api/v1/users?q=reset2@example.org', { token: adminToken });
+    return list.data.data.find((u) => u.id === user.id);
+  };
+  const before = await find();
+  assert.equal((await resetPassword(user.id)).status, 200);
+  const after = await find();
+  assert.deepEqual(after.team, before.team);
+  assert.equal(after.role, before.role);
+  assert.equal(after.is_active, before.is_active);
+});
+
+test('รีเซ็ตสองครั้งได้รหัสต่างกัน และรหัสล่าสุดเท่านั้นที่ใช้ได้', async () => {
+  const user = await register('reset3@example.org');
+  const first = (await resetPassword(user.id)).data.data.temporary_password;
+  const second = (await resetPassword(user.id)).data.data.temporary_password;
+  assert.notEqual(first, second);
+  assert.equal((await login('reset3@example.org', first)).status, 401);
+  assert.equal((await login('reset3@example.org', second)).status, 200);
+});
+
+test('คำตอบรีเซ็ตรหัสผ่านห้ามถูก cache และไม่มี password_hash', async () => {
+  const user = await register('reset4@example.org');
+  const res = await fetch(`${base}/api/v1/users/${user.id}/reset-password`, {
+    method: 'POST',
+    headers: { authorization: `Bearer ${adminToken}` }
+  });
+  assert.equal(res.status, 200);
+  assert.match(res.headers.get('cache-control') ?? '', /no-store/);
+  assert.doesNotMatch(await res.text(), /password_hash/);
+});
+
+test('รีเซ็ตรหัสผ่านของ id ที่ไม่มี -> 404 ข้อความภาษาไทย', async () => {
+  const res = await resetPassword('3f2c9a54-6b1e-4d0a-9c75-2d8e1f4b7a10');
+  assert.equal(res.status, 404);
+  // the route's own message, not the generic "endpoint not found" from app.js
+  assert.equal(res.data.error.message, 'ไม่พบผู้ใช้นี้');
+});
+
+test('member รีเซ็ตรหัสผ่านไม่ได้ (403) คนไม่ login ก็ไม่ได้ (401) และรหัสเดิมยังใช้ได้', async () => {
+  const user = await register('reset5@example.org');
+  const asMember = await resetPassword(user.id, memberA.token);
+  assert.equal(asMember.status, 403);
+  const anon = await call(`/api/v1/users/${user.id}/reset-password`, { method: 'POST' });
+  assert.equal(anon.status, 401);
+  assert.equal((await login('reset5@example.org', 'password-1234')).status, 200);
+});
+
+test('บัญชีที่ถูกระงับ: รีเซ็ตได้ แต่ login ด้วยรหัสชั่วคราวยังถูกปฏิเสธ (403)', async () => {
+  const user = await register('reset6@example.org');
+  await call(`/api/v1/users/${user.id}`, {
+    token: adminToken,
+    method: 'PATCH',
+    body: { is_active: false }
+  });
+  const res = await resetPassword(user.id);
+  assert.equal(res.status, 200);
+  const attempt = await login('reset6@example.org', res.data.data.temporary_password);
+  assert.equal(attempt.status, 403);
+});
