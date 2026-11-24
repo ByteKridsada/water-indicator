@@ -1408,11 +1408,16 @@ fieldset {
   color: var(--muted);
 }
 
+/* padding (not margin) so the side gutters belong to the section: a click there must not
+   count as a backdrop click, which is any click whose target is the <dialog> itself */
 .dialog__section {
+  padding: 0 26px;
+}
+
+.dialog__section-body {
   display: flex;
   flex-direction: column;
   gap: 12px;
-  margin: 0 26px;
   padding: 22px 0 26px;
   border-top: 1px solid var(--line);
 }

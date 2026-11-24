@@ -14,6 +14,8 @@ export function UserEditDialog({ user, teams, onClose, onSaved }) {
   const [role, setRole] = useState(user.role);
   const [isActive, setIsActive] = useState(user.is_active);
   const [saving, setSaving] = useState(false);
+  // true while the password-reset request is in flight (set by ResetPasswordPanel)
+  const [resetBusy, setResetBusy] = useState(false);
   const [error, setError] = useState('');
 
   // Open as a modal on mount ≈ presenting a .sheet in SwiftUI: the platform traps focus,
@@ -34,13 +36,13 @@ export function UserEditDialog({ user, teams, onClose, onSaved }) {
   const dirty = Object.keys(changes).length > 0;
 
   function handleCancel(e) {
-    // Escape while a save is in flight: keep the dialog open until it finishes
-    if (saving) e.preventDefault();
+    // Escape while a save or a password reset is in flight: keep the dialog open until it finishes
+    if (saving || resetBusy) e.preventDefault();
   }
 
   function handleBackdropClick(e) {
     // the dialog element has no padding, so a click whose target is the dialog itself hit the backdrop
-    if (e.target === dialogRef.current && !saving) dialogRef.current.close();
+    if (e.target === dialogRef.current && !saving && !resetBusy) dialogRef.current.close();
   }
 
   async function handleSubmit(e) {
@@ -159,7 +161,7 @@ export function UserEditDialog({ user, teams, onClose, onSaved }) {
             <button type="button" className="btn btn--quiet" onClick={() => dialogRef.current?.close()}>
               ยกเลิก
             </button>
-            <button type="submit" className="btn btn--primary" disabled={!dirty}>
+            <button type="submit" className="btn btn--primary" disabled={!dirty || resetBusy}>
               {saving ? 'กำลังบันทึก...' : 'บันทึก'}
             </button>
           </div>
@@ -167,7 +169,7 @@ export function UserEditDialog({ user, teams, onClose, onSaved }) {
       </form>
 
       {/* outside the edit form: it acts on its own and doesn't depend on Save/dirty state */}
-      <ResetPasswordPanel user={user} />
+      <ResetPasswordPanel user={user} disabled={saving} onBusyChange={setResetBusy} />
     </dialog>
   );
 }
