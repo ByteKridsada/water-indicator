@@ -28,6 +28,13 @@ export function ResetPasswordPanel({ user, disabled = false, onBusyChange }) {
     }
   }
 
+  // clear the password from the screen without closing the dialog (e.g. to keep editing other fields)
+  function handleHide() {
+    setTemporaryPassword('');
+    setCopyNote('');
+    setPhase('idle');
+  }
+
   async function handleCopy() {
     try {
       await navigator.clipboard.writeText(temporaryPassword);
@@ -70,6 +77,11 @@ export function ResetPasswordPanel({ user, disabled = false, onBusyChange }) {
             <p className="dialog__sub">
               รหัสนี้แสดงครั้งเดียว ปิดหน้าต่างนี้แล้วจะดูอีกไม่ได้ ส่งให้ผู้ใช้ แล้วบอกให้เปลี่ยนรหัสผ่านใหม่ที่หน้าโปรไฟล์หลังเข้าสู่ระบบ
             </p>
+            <div>
+              <button type="button" className="btn btn--quiet btn--small" onClick={handleHide}>
+                ซ่อนรหัส
+              </button>
+            </div>
           </div>
         ) : phase === 'idle' ? (
           <div className="stack" style={{ gap: 12 }}>

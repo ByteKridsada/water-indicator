@@ -64,4 +64,4 @@ npm run lint
 - Hiding UI by role is for usability only; the backend enforces permissions.
 - Styling follows design direction C: tokens at the top of `src/index.css`; teal is the brand and data color, indigo is for interaction and selection. Keep status colors (green, amber, red) out of the UI until water-quality thresholds exist.
 
-Known gaps: overlapping map markers aren't clustered, there's no "forgot password" flow, and there are no frontend tests.
+Known gaps: overlapping map markers aren't clustered, there's no email or self-service password reset (an admin issues a temporary password from the users page via `POST /users/:id/reset-password`; existing tokens stay valid and nothing forces a change on first login), and there are no frontend tests.
